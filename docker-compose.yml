@@ -1,0 +1,123 @@
+# =============================================================================
+# Enterprise RAG & GenAI Knowledge Base — docker-compose.yml
+#
+# Services
+# ─────────
+#   rag-api   FastAPI application (ChromaDB embedded, bge-small-en-v1.5)
+#   ollama    Local LLM inference server (optional; used when LLM_PROVIDER=ollama)
+#
+# Quick start
+# ──────────
+#   cp .env.example .env          # fill in any secrets
+#   docker compose up -d          # start all services
+#   docker compose exec ollama \
+#     ollama pull llama3.1        # pull the model on first run
+#   open http://localhost:8000/docs
+#
+# Volumes (all named — survive `docker compose down`)
+# ────────────────────────────────────────────────────
+#   chroma-data       ChromaDB on-disk vector store
+#   hf-model-cache    HuggingFace model weights (avoids re-download on restart)
+#   upload-data       User-uploaded source documents
+#   processed-data    Parent-chunk JSON docstore
+#   log-data          Rotating application logs
+#   ollama-data       Ollama model blobs
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # RAG API
+  # ---------------------------------------------------------------------------
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: enterprise-rag:latest
+    container_name: enterprise-rag-api
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # These override .env so container paths are always correct
+      APP_ENV: production
+      CHROMA_PERSIST_DIR: /app/storage/chroma
+      UPLOAD_DIR: /app/data/uploads
+      HF_HOME: /app/.cache/huggingface
+      TOKENIZERS_PARALLELISM: "false"
+      # Point at the ollama service by container name (overrides .env)
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - chroma-data:/app/storage/chroma
+      - hf-model-cache:/app/.cache/huggingface
+      - upload-data:/app/data/uploads
+      - processed-data:/app/data/processed
+      - log-data:/app/logs
+    depends_on:
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s   # allow time for model download on first boot
+      retries: 3
+    networks:
+      - rag-net
+    # Resource limits — tune for your hardware
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 6G
+        reservations:
+          memory: 2G
+
+  # ---------------------------------------------------------------------------
+  # Ollama — local LLM inference
+  # Remove this service if you use LLM_PROVIDER=openai or azure_openai.
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: enterprise-rag-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - rag-net
+    # GPU support — uncomment the lines below if you have an NVIDIA GPU
+    # and the NVIDIA Container Toolkit installed.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+# =============================================================================
+# Named volumes — data persists across `docker compose down / up` cycles.
+# Use `docker compose down -v` to wipe everything (destructive!).
+# =============================================================================
+volumes:
+  chroma-data:
+    driver: local
+  hf-model-cache:
+    driver: local
+  upload-data:
+    driver: local
+  processed-data:
+    driver: local
+  log-data:
+    driver: local
+  ollama-data:
+    driver: local
+
+networks:
+  rag-net:
+    driver: bridge
