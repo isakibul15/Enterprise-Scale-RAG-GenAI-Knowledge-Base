@@ -20,20 +20,20 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
                         └────────┬───────────────┬────────────────┘
                                  │               │
                ┌─────────────────▼──┐     ┌──────▼──────────────────┐
-               │  Ingestion Pipeline │     │     RAG Chain (LCEL)     │
-               │  load → chunk →     │     │  condense → retrieve →   │
-               │  embed → upsert     │     │  prompt → LLM → cite     │
+               │  Ingestion Pipeline│     │     RAG Chain (LCEL)    │
+               │  load → chunk →    │     │  condense → retrieve →  │
+               │  embed → upsert    │     │  prompt → LLM → cite    │
                └─────────┬──────────┘     └──────┬──────────────────┘
                          │                        │
                ┌─────────▼────────────────────────▼──────┐
-               │         ChromaDB  (embedded, persistent) │
-               │         BAAI/bge-small-en-v1.5 · 384-dim │
+               │         ChromaDB  (embedded, persistent)│
+               │         BAAI/bge-small-en-v1.5 · 384-dim│
                └─────────────────────────────────────────┘
                                       │
                           ┌───────────▼────────────┐
-                          │    LLM Backend          │
-                          │  Ollama · OpenAI · Azure│
-                          └─────────────────────────┘
+                          │    LLM Backend         │
+                          │ Ollama · OpenAI · Azure│
+                          └────────────────────────┘
 ```
 
 ---
