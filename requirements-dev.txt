@@ -1,0 +1,19 @@
+# ============================================================
+# Development & Testing Dependencies (not included in Docker image)
+# ============================================================
+-r requirements.txt
+
+# --- Testing ---
+pytest==8.3.2
+pytest-asyncio==0.23.8
+pytest-cov==5.0.0
+httpx==0.27.2                    # async test client for FastAPI
+
+# --- Code Quality ---
+black==24.8.0
+ruff==0.6.4
+mypy==1.11.2
+
+# --- Type Stubs ---
+types-aiofiles==23.2.0.20240403
+types-tqdm==4.66.0.20240417

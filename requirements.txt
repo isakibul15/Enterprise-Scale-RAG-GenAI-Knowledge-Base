@@ -1,0 +1,59 @@
+# ============================================================
+# Enterprise RAG & GenAI Knowledge Base — Production Requirements
+# Python 3.11+
+# ============================================================
+
+# --- Core API Framework ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9          # file upload support
+
+# --- Data Validation & Settings ---
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# --- LangChain Ecosystem ---
+langchain==0.2.16
+langchain-core==0.2.38
+langchain-community==0.2.16
+langchain-huggingface==0.0.3     # HuggingFace LLM/embedding integration
+langchain-qdrant==0.1.3          # Qdrant vector store integration
+langchain-openai==0.1.23         # OpenAI-compatible LLMs (optional)
+
+# --- Embeddings (HuggingFace / Sentence-Transformers) ---
+sentence-transformers==3.0.1     # BGE-M3, MiniLM, etc.
+transformers==4.44.2
+tokenizers==0.19.1
+huggingface-hub==0.24.6
+
+# --- PyTorch (CPU; swap for +cu121 wheel in GPU environments) ---
+torch==2.4.0
+
+# --- Vector Database ---
+qdrant-client==1.11.0            # on-disk + server modes
+
+# --- Document Loaders ---
+pypdf==4.3.1                     # PDF parsing
+python-docx==1.1.2               # .docx parsing
+unstructured[local-inference]==0.15.0  # HTML, TXT, PPTX, XLSX, etc.
+python-magic==0.4.27             # MIME-type detection
+
+# --- LLM Backends ---
+openai==1.43.0                   # OpenAI / Azure OpenAI
+ollama==0.3.3                    # Local LLMs via Ollama
+
+# --- Async & HTTP ---
+httpx==0.27.2
+aiofiles==23.2.1
+
+# --- Resilience ---
+tenacity==8.5.0                  # Retry / back-off
+
+# --- Logging & Observability ---
+loguru==0.7.2
+prometheus-client==0.20.0
+
+# --- Utilities ---
+python-dotenv==1.0.1
+tqdm==4.66.5
+numpy==1.26.4
