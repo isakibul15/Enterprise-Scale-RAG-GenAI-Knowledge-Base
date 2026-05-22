@@ -12,10 +12,10 @@ Usage:
     # Override chunk settings at runtime
     python scripts/ingest_bulk.py --path data/raw/ --chunk-size 256 --chunk-overlap 32
 
-    # Target a specific Qdrant collection
+    # Target a specific ChromaDB collection
     python scripts/ingest_bulk.py --path data/raw/ --collection my_collection
 
-    # Dry-run: only load and split, skip Qdrant upsert
+    # Dry-run: only load and split, skip ChromaDB upsert
     python scripts/ingest_bulk.py --path data/raw/ --dry-run
 """
 
@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
         "--collection",
         type=str,
         default=None,
-        help="Qdrant collection name (defaults to QDRANT_COLLECTION_NAME env var)",
+        help="ChromaDB collection name (defaults to COLLECTION_NAME env var)",
     )
     parser.add_argument(
         "--chunk-size",
@@ -75,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-size",
         type=int,
         default=64,
-        help="Number of chunks per Qdrant upsert batch",
+        help="Number of chunks per ChromaDB upsert batch",
     )
     parser.add_argument(
         "--no-re-ingest",
@@ -88,7 +88,7 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         default=False,
-        help="Load and chunk documents without upserting into Qdrant",
+        help="Load and chunk documents without upserting into ChromaDB",
     )
     return parser.parse_args()
 
@@ -140,7 +140,7 @@ def main() -> int:
         return 1
 
     if args.dry_run:
-        logger.info("Dry-run mode — no data will be written to Qdrant")
+        logger.info("Dry-run mode — no data will be written to ChromaDB")
         dry_run(args.path, args.recursive, args.chunk_size, args.chunk_overlap)
         return 0
 
