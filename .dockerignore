@@ -1,0 +1,64 @@
+# =============================================================================
+# .dockerignore — keeps the build context lean and prevents secrets leaking
+# into the image layer cache.
+# =============================================================================
+
+# --- Version control ---
+.git/
+.gitignore
+
+# --- Python artefacts ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+.python-version
+
+# --- Test & tooling ---
+tests/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Runtime data (mounted as volumes at runtime, not baked in) ---
+data/raw/
+data/processed/
+data/uploads/
+storage/
+logs/
+
+# --- Model cache (mounted as a named volume) ---
+.cache/
+
+# --- Secrets (never bake .env into an image) ---
+.env
+.env.*
+!.env.example
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# --- Docker files themselves (no need to recurse) ---
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# --- Docs & scripts not needed at runtime ---
+*.md
+Makefile
