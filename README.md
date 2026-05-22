@@ -15,8 +15,8 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
 
 ```
                         ┌─────────────────────────────────────────┐
-                        │              FastAPI Service             │
-                        │  POST /upload  POST /query  GET /health  │
+                        │              FastAPI Service            │
+                        │  POST /upload  POST /query  GET /health │
                         └────────┬───────────────┬────────────────┘
                                  │               │
                ┌─────────────────▼──┐     ┌──────▼──────────────────┐
