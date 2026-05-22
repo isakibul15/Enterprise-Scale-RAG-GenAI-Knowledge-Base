@@ -41,5 +41,5 @@ async def health() -> HealthResponse:
         status=overall,
         chromadb=chroma_status,
         embedding_model=f"{settings.embedding_model} ({embed_status})",
-        llm_provider=str(settings.llm_provider),
+        llm_provider=settings.llm_provider.value,
     )

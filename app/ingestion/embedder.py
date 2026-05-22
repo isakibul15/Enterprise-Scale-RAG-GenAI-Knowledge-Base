@@ -36,7 +36,9 @@ def get_embedding_model() -> HuggingFaceEmbeddings:
             # normalize_embeddings=True is required for BGE and most bi-encoders
             # so that cosine similarity == dot product (faster ChromaDB search)
             "normalize_embeddings": True,
-            "show_progress_bar": False,
+            # show_progress_bar is intentionally omitted — langchain_huggingface
+            # already passes it internally to encode(); including it here raises
+            # "multiple values for keyword argument 'show_progress_bar'"
         },
         cache_folder=".cache/sentence_transformers",
     )

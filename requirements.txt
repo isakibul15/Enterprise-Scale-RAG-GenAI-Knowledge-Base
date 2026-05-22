@@ -1,6 +1,6 @@
 # ============================================================
 # Enterprise RAG & GenAI Knowledge Base — Production Requirements
-# Python 3.11+
+# Python 3.11+ / 3.13 (M4 Mac compatible)
 # ============================================================
 
 # --- Core API Framework ---
@@ -26,8 +26,8 @@ transformers==4.44.2
 tokenizers==0.19.1
 huggingface-hub==0.24.6
 
-# --- PyTorch (CPU; swap for +cu121 wheel in GPU environments) ---
-torch==2.4.0
+# --- PyTorch (CPU; M4 Mac requires torch>=2.9.0 on Python 3.13) ---
+torch>=2.9.0
 
 # --- Vector Database ---
 chromadb==0.5.3                  # embedded persistent mode (no separate server needed)

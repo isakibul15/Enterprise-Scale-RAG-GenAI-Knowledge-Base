@@ -1,23 +1,7 @@
-from app.retrieval.vector_store import (
-    get_langchain_vector_store,
-    get_chroma_client,
-    upsert_documents,
-    delete_by_source,
-)
-from app.retrieval.chain import ask, stream_ask, clear_session, RAGResponse
-from app.retrieval.retriever import get_retriever
+# Import directly from the specific module files, not from this package.
+# e.g. from app.retrieval.chain import ask
+#      from app.retrieval.vector_store import get_langchain_vector_store
+#
+# Eager package-level re-exports here cause a circular import:
+#   retrieval/__init__ → vector_store → ingestion/__init__ → pipeline → vector_store
 
-__all__ = [
-    # vector store
-    "get_langchain_vector_store",
-    "get_chroma_client",
-    "upsert_documents",
-    "delete_by_source",
-    # chain
-    "ask",
-    "stream_ask",
-    "clear_session",
-    "RAGResponse",
-    # retriever
-    "get_retriever",
-]

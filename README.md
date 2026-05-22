@@ -11,6 +11,25 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
 
 ---
 
+## 🎥 Live Demo
+
+<p align="center">
+  <img src="Demo.png" alt="Enterprise RAG Knowledge Base Demo" width="90%" />
+</p>
+
+**See it in action:** Upload your documents → Ask questions in natural language → Get AI-powered answers with exact source citations.
+
+### ✨ Key Features
+
+- 📄 **Multi-format Ingestion** — PDF, DOCX, TXT, MD, HTML, CSV  
+- 🔍 **Semantic Search** — Find relevant context using embeddings  
+- 💬 **Conversational RAG** — Chat with citations, session history  
+- ⚡ **Streaming Responses** — Real-time token-by-token answers  
+- 🛡️ **No Hallucinations** — Grounded answers backed by source documents  
+- 🐳 **Production Ready** — Docker, scaling, comprehensive API  
+
+---
+
 ## Architecture
 
 ```
@@ -50,20 +69,6 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
 | Document Loaders | PyPDF, python-docx, Unstructured (HTML, CSV, MD, TXT) |
 | Logging | Loguru — structured, rotating, JSONL |
 | Containerisation | Docker, Docker Compose v2 |
-
----
-
-## Demo
-
-<div align="center">
-
-### Enterprise RAG Knowledge Base in Action
-
-![Demo Screenshot](Demo.png)
-
-*Upload documents → Ask questions → Get answers with citations — instantly.*
-
-</div>
 
 ---
 
