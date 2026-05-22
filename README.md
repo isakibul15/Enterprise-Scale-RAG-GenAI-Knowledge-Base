@@ -53,6 +53,20 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
 
 ---
 
+## Demo
+
+<div align="center">
+
+### Enterprise RAG Knowledge Base in Action
+
+![Demo Screenshot](Demo.png)
+
+*Upload documents → Ask questions → Get answers with citations — instantly.*
+
+</div>
+
+---
+
 ## Quick Start (Docker)
 
 ```bash
