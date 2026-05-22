@@ -34,7 +34,7 @@ def get_embedding_model() -> HuggingFaceEmbeddings:
         encode_kwargs={
             "batch_size": settings.embedding_batch_size,
             # normalize_embeddings=True is required for BGE and most bi-encoders
-            # so that cosine similarity == dot product (faster Qdrant search)
+            # so that cosine similarity == dot product (faster ChromaDB search)
             "normalize_embeddings": True,
             "show_progress_bar": False,
         },
