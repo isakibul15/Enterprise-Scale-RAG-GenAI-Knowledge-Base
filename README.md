@@ -11,8 +11,6 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
 
 ---
 
-## 🎥 Live Demo
-
 <p align="center">
   <img src="Demo.png" alt="Enterprise RAG Knowledge Base Demo" width="90%" />
 </p>
