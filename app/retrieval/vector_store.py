@@ -1,91 +1,84 @@
 """
-Qdrant vector store wrapper.
+ChromaDB vector store wrapper.
+
+ChromaDB runs embedded inside the process — no separate server required.
+Data is persisted automatically to CHROMA_PERSIST_DIR on every write.
 
 Handles:
-  - Client creation (local on-disk or remote server)
-  - Collection bootstrap with correct vector schema
-  - Idempotent upsert of LangChain Documents
+  - PersistentClient creation (one per process)
+  - Collection bootstrap with cosine distance
+  - Idempotent upsert of LangChain Documents (chunk_id as Chroma ID)
   - Delete-by-source for re-ingestion workflows
-  - LangChain-compatible QdrantVectorStore accessor for Milestone 3
+  - LangChain-compatible Chroma accessor for the retriever / QA chain
 
-Design: keeps a single QdrantClient per process (module-level singleton).
+ChromaDB upsert semantics: if a document with the same ID already exists,
+it is overwritten. Re-ingesting the same file therefore produces zero duplicates
+as long as chunk_ids are stable (they are — see splitter.py).
 """
 
 from functools import lru_cache
-from typing import Any
 
+import chromadb
+from chromadb import Collection
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_qdrant import QdrantVectorStore
 from loguru import logger
-from qdrant_client import QdrantClient
-from qdrant_client.http import models as qmodels
-from qdrant_client.http.exceptions import UnexpectedResponse
 
-from app.core.config import settings, QdrantMode
+from app.core.config import settings
 from app.ingestion.embedder import get_embedding_dimension, get_embedding_model
 
-# Qdrant payload field used to store the raw document text
+# ChromaDB payload key that stores the raw document text
 CONTENT_FIELD = "page_content"
 
 
+# ---------------------------------------------------------------------------
+# Client singleton
+# ---------------------------------------------------------------------------
+
 @lru_cache(maxsize=1)
-def get_qdrant_client() -> QdrantClient:
-    """Return the process-level Qdrant client (local or server)."""
-    if settings.qdrant_mode == QdrantMode.local:
-        settings.qdrant_local_path.mkdir(parents=True, exist_ok=True)
-        logger.info("Qdrant: on-disk mode at '{}'", settings.qdrant_local_path)
-        return QdrantClient(path=str(settings.qdrant_local_path))
+def get_chroma_client() -> chromadb.PersistentClient:
+    """
+    Return the process-level ChromaDB persistent client.
 
-    logger.info(
-        "Qdrant: server mode at {}:{}",
-        settings.qdrant_host,
-        settings.qdrant_port,
-    )
-    return QdrantClient(
-        host=settings.qdrant_host,
-        port=settings.qdrant_port,
-        timeout=30,
-    )
+    Creates the persistence directory if it does not exist.
+    The client is cached so all callers share the same connection pool.
+    """
+    persist_path = settings.chroma_persist_dir
+    persist_path.mkdir(parents=True, exist_ok=True)
+    logger.info("ChromaDB: persistent mode at '{}'", persist_path)
+    return chromadb.PersistentClient(path=str(persist_path))
 
 
-def ensure_collection(
-    client: QdrantClient,
+# ---------------------------------------------------------------------------
+# Collection bootstrap
+# ---------------------------------------------------------------------------
+
+def get_or_create_collection(
+    client: chromadb.PersistentClient,
     collection_name: str,
-    vector_size: int,
-) -> None:
+) -> Collection:
     """
-    Create the Qdrant collection if it does not already exist.
+    Return the named collection, creating it if necessary.
 
-    Uses cosine distance — correct for normalized BGE embeddings.
-    Idempotent: safe to call on every startup.
+    Uses cosine distance — correct for L2-normalised BGE embeddings.
+    Setting hnsw:space at creation time is permanent; it cannot be changed
+    without deleting and recreating the collection.
     """
-    existing = {c.name for c in client.get_collections().collections}
-    if collection_name in existing:
-        logger.info("Collection '{}' already exists — skipping creation", collection_name)
-        return
-
+    collection = client.get_or_create_collection(
+        name=collection_name,
+        metadata={"hnsw:space": "cosine"},
+    )
     logger.info(
-        "Creating collection '{}' (dim={}, metric=Cosine)",
+        "Collection '{}' ready ({} existing vectors)",
         collection_name,
-        vector_size,
+        collection.count(),
     )
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=qmodels.VectorParams(
-            size=vector_size,
-            distance=qmodels.Distance.COSINE,
-            on_disk=True,           # offload vectors to disk, keeps RAM lean
-        ),
-        optimizers_config=qmodels.OptimizersConfigDiff(
-            indexing_threshold=20_000,  # build HNSW only after 20k vectors
-        ),
-        hnsw_config=qmodels.HnswConfigDiff(
-            m=16,
-            ef_construct=100,
-        ),
-    )
-    logger.info("Collection '{}' created successfully", collection_name)
+    return collection
 
+
+# ---------------------------------------------------------------------------
+# Upsert
+# ---------------------------------------------------------------------------
 
 def upsert_documents(
     documents: list[Document],
@@ -93,21 +86,20 @@ def upsert_documents(
     batch_size: int = 64,
 ) -> int:
     """
-    Embed and upsert *documents* into Qdrant.
+    Embed and upsert *documents* into ChromaDB.
 
-    Uses the chunk_id stored in document metadata as the Qdrant point ID so
-    re-ingesting the same content is idempotent (upsert semantics).
+    Uses chunk_id from document metadata as the ChromaDB document ID so
+    re-ingesting the same content is idempotent.
 
-    Returns the number of points successfully upserted.
+    Returns the number of documents successfully upserted.
     """
     if not documents:
         return 0
 
-    coll = collection_name or settings.qdrant_collection_name
-    client = get_qdrant_client()
+    coll_name = collection_name or settings.collection_name
+    client = get_chroma_client()
+    collection = get_or_create_collection(client, coll_name)
     embed_model = get_embedding_model()
-
-    ensure_collection(client, coll, get_embedding_dimension())
 
     texts = [doc.page_content for doc in documents]
     total_upserted = 0
@@ -127,86 +119,102 @@ def upsert_documents(
             )
             raise
 
-        points = [
-            qmodels.PointStruct(
-                id=doc.metadata["chunk_id"],
-                vector=vector,
-                payload={
-                    CONTENT_FIELD: doc.page_content,
-                    **doc.metadata,
-                },
-            )
-            for doc, vector in zip(batch_docs, vectors)
-        ]
+        ids = [doc.metadata["chunk_id"] for doc in batch_docs]
+
+        # Flatten metadata: ChromaDB only accepts str / int / float / bool values.
+        # Any complex types (lists, dicts, None) are cast to strings.
+        metadatas = [_sanitise_metadata(doc.metadata) for doc in batch_docs]
 
         try:
-            client.upsert(collection_name=coll, points=points, wait=True)
-            total_upserted += len(points)
-            logger.debug(
-                "Upserted batch [{}-{}] ({} points)",
-                batch_start,
-                batch_start + len(points),
-                len(points),
+            collection.upsert(
+                ids=ids,
+                embeddings=vectors,
+                documents=batch_texts,
+                metadatas=metadatas,
             )
-        except UnexpectedResponse as exc:
-            logger.error("Qdrant upsert failed: {}", exc)
+            total_upserted += len(ids)
+            logger.debug(
+                "Upserted batch [{}-{}] ({} docs)",
+                batch_start,
+                batch_start + len(ids),
+                len(ids),
+            )
+        except Exception as exc:
+            logger.error("ChromaDB upsert failed: {}", exc)
             raise
 
     logger.info(
-        "Upserted {} point(s) into collection '{}'",
+        "Upserted {} document(s) into collection '{}'",
         total_upserted,
-        coll,
+        coll_name,
     )
     return total_upserted
 
 
-def delete_by_source(source_path: str, collection_name: str | None = None) -> int:
+def _sanitise_metadata(metadata: dict) -> dict:
     """
-    Delete all points whose `source` payload matches *source_path*.
-
-    Used when re-ingesting an updated file — purge old chunks first.
-    Returns the number of points deleted.
+    ChromaDB rejects None and non-scalar values in metadata.
+    Cast everything to a safe type so upserts never fail on metadata alone.
     """
-    coll = collection_name or settings.qdrant_collection_name
-    client = get_qdrant_client()
+    safe: dict = {}
+    for k, v in metadata.items():
+        if isinstance(v, (str, int, float, bool)):
+            safe[k] = v
+        elif v is None:
+            safe[k] = ""
+        else:
+            safe[k] = str(v)
+    return safe
 
-    result = client.delete(
-        collection_name=coll,
-        points_selector=qmodels.FilterSelector(
-            filter=qmodels.Filter(
-                must=[
-                    qmodels.FieldCondition(
-                        key="source",
-                        match=qmodels.MatchValue(value=source_path),
-                    )
-                ]
-            )
-        ),
-        wait=True,
-    )
-    logger.info("Deleted points for source '{}': {}", source_path, result)
-    return 0  # Qdrant delete result doesn't expose a count directly
 
+# ---------------------------------------------------------------------------
+# Delete by source
+# ---------------------------------------------------------------------------
+
+def delete_by_source(source_path: str, collection_name: str | None = None) -> None:
+    """
+    Delete all documents whose `source` metadata field matches *source_path*.
+
+    Called before re-ingesting an updated file so stale chunks are purged first.
+    ChromaDB's `where` filter uses exact string matching.
+    """
+    coll_name = collection_name or settings.collection_name
+    client = get_chroma_client()
+    collection = get_or_create_collection(client, coll_name)
+
+    try:
+        collection.delete(where={"source": source_path})
+        logger.info("Deleted existing chunks for source '{}'", source_path)
+    except Exception as exc:
+        # ChromaDB raises if no documents match the filter — treat as a no-op
+        logger.debug("delete_by_source no-op for '{}': {}", source_path, exc)
+
+
+# ---------------------------------------------------------------------------
+# LangChain-compatible store (used by retriever and QA chain)
+# ---------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)
 def get_langchain_vector_store(
     collection_name: str | None = None,
-) -> QdrantVectorStore:
+) -> Chroma:
     """
-    Return a LangChain-compatible QdrantVectorStore.
+    Return a LangChain Chroma instance backed by the persistent client.
 
-    Used by the retriever and QA chain in Milestone 3.
-    Cached — same object reused across requests.
+    Cached — the same object is reused across all requests. The underlying
+    ChromaDB client handles thread safety internally.
     """
-    coll = collection_name or settings.qdrant_collection_name
-    client = get_qdrant_client()
+    coll_name = collection_name or settings.collection_name
+    client = get_chroma_client()
     embed_model = get_embedding_model()
 
-    ensure_collection(client, coll, get_embedding_dimension())
+    # Ensure the collection exists before handing it to LangChain
+    get_or_create_collection(client, coll_name)
 
-    return QdrantVectorStore(
+    store = Chroma(
         client=client,
-        collection_name=coll,
-        embedding=embed_model,
-        content_payload_key=CONTENT_FIELD,
+        collection_name=coll_name,
+        embedding_function=embed_model,
     )
+    logger.info("LangChain Chroma store ready (collection='{}')", coll_name)
+    return store
