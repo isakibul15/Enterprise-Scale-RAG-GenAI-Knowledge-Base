@@ -2,7 +2,7 @@
 Text chunking strategies.
 
 Produces two granularities of chunks:
-  - child chunks  → small, embedded and stored in Qdrant (used for retrieval)
+  - child chunks  → small, embedded and stored in ChromaDB (used for retrieval)
   - parent chunks → large, stored in a docstore (used for ParentDocumentRetriever in M3)
 
 A stable `chunk_id` (UUID5 over source + content) enables idempotent upserts.
