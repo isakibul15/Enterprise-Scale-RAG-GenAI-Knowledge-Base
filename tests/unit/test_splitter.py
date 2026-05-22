@@ -1,4 +1,4 @@
-"""Unit tests for DocumentSplitter — no network, no Qdrant."""
+"""Unit tests for DocumentSplitter — no network, no ChromaDB."""
 
 import pytest
 from langchain_core.documents import Document

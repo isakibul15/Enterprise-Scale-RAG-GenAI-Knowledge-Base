@@ -17,11 +17,6 @@ class LLMProvider(str, Enum):
     ollama = "ollama"
 
 
-class QdrantMode(str, Enum):
-    local = "local"
-    server = "server"
-
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -36,15 +31,12 @@ class Settings(BaseSettings):
     app_port: int = 8000
     log_level: str = "INFO"
 
-    # Qdrant
-    qdrant_mode: QdrantMode = QdrantMode.local
-    qdrant_local_path: Path = Path("./storage/qdrant")
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-    qdrant_collection_name: str = "knowledge_base"
+    # ChromaDB
+    chroma_persist_dir: Path = Path("./storage/chroma")
+    collection_name: str = "knowledge_base"
 
     # Embedding
-    embedding_model: str = "BAAI/bge-m3"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_device: str = "cpu"
     embedding_batch_size: int = Field(32, gt=0, le=512)
 
@@ -65,7 +57,6 @@ class Settings(BaseSettings):
     # Retrieval
     retriever_top_k: int = Field(6, gt=0)
     parent_chunk_size: int = Field(2048, gt=0)
-    enable_hybrid_search: bool = False
 
     # Storage
     upload_dir: Path = Path("./data/uploads")

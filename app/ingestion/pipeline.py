@@ -106,11 +106,11 @@ class IngestionPipeline:
     Orchestrates the full load → split → embed → upsert pipeline.
 
     Args:
-        collection_name: Override the default Qdrant collection.
+        collection_name: Override the default ChromaDB collection.
         re_ingest: If True, delete existing chunks for a source before upserting.
         child_chunk_size: Override settings.chunk_size.
         child_chunk_overlap: Override settings.chunk_overlap.
-        batch_size: Number of child chunks per Qdrant upsert call.
+        batch_size: Number of child chunks per ChromaDB upsert call.
     """
 
     def __init__(
@@ -199,7 +199,7 @@ class IngestionPipeline:
         if self._re_ingest:
             delete_by_source(source, collection_name=self._collection)
 
-        # --- upsert children into Qdrant ---
+        # --- upsert children into ChromaDB ---
         _upsert_with_retry(split.child_chunks, self._collection)
 
         # --- persist parent chunks to local JSON docstore ---
