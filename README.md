@@ -24,11 +24,11 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
                │  load → chunk →    │     │  condense → retrieve →  │
                │  embed → upsert    │     │  prompt → LLM → cite    │
                └─────────┬──────────┘     └──────┬──────────────────┘
-                         │                        │
-               ┌─────────▼────────────────────────▼──────┐
-               │         ChromaDB  (embedded, persistent)│
-               │         BAAI/bge-small-en-v1.5 · 384-dim│
-               └─────────────────────────────────────────┘
+                         │                       │
+               ┌─────────▼───────────────────────▼──────┐
+               │     ChromaDB  (embedded, persistent)   │
+               │     BAAI/bge-small-en-v1.5 · 384-dim   │
+               └────────────────────────────────────────┘
                                       │
                           ┌───────────▼────────────┐
                           │    LLM Backend         │
