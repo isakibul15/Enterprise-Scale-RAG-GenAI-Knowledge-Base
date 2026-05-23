@@ -21,6 +21,8 @@ Design notes
 """
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.documents import Document
+from typing import List
 
 # ---------------------------------------------------------------------------
 # 1. Condense / history-aware retrieval prompt
@@ -96,13 +98,19 @@ QA_PROMPT = ChatPromptTemplate.from_messages(
 # Context formatter — converts retrieved Documents into the {context} string
 # ---------------------------------------------------------------------------
 
-def format_retrieved_docs(docs) -> str:
+def format_retrieved_docs(docs: List[Document]) -> str:
     """
     Render a list of LangChain Documents into a numbered context block.
 
     Each excerpt carries its source path and page number so the model can
-    produce accurate citations.  An empty list renders a sentinel string that
+    produce accurate citations. An empty list renders a sentinel string that
     triggers the "insufficient context" path in the QA prompt.
+
+    Args:
+        docs: List of retrieved Document objects with metadata
+
+    Returns:
+        Formatted context string with numbered entries and source citations
     """
     if not docs:
         return "[No relevant documents were retrieved for this query.]"
