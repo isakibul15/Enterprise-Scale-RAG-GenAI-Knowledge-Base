@@ -42,11 +42,21 @@ def get_chroma_client() -> chromadb.PersistentClient:
 
     Creates the persistence directory if it does not exist.
     The client is cached so all callers share the same connection pool.
+
+    Returns:
+        PersistentClient: Cached ChromaDB client instance
+
+    Raises:
+        RuntimeError: If client initialization fails
     """
-    persist_path = settings.chroma_persist_dir
-    persist_path.mkdir(parents=True, exist_ok=True)
-    logger.info("ChromaDB: persistent mode at '{}'", persist_path)
-    return chromadb.PersistentClient(path=str(persist_path))
+    try:
+        persist_path = settings.chroma_persist_dir
+        persist_path.mkdir(parents=True, exist_ok=True)
+        logger.info("ChromaDB: persistent mode at '{}'", persist_path)
+        return chromadb.PersistentClient(path=str(persist_path))
+    except Exception as e:
+        logger.error("Failed to initialize ChromaDB client: {}", str(e))
+        raise RuntimeError(f"ChromaDB initialization failed: {e}") from e
 
 
 # ---------------------------------------------------------------------------
@@ -63,17 +73,31 @@ def get_or_create_collection(
     Uses cosine distance — correct for L2-normalised BGE embeddings.
     Setting hnsw:space at creation time is permanent; it cannot be changed
     without deleting and recreating the collection.
+
+    Args:
+        client: ChromaDB persistent client
+        collection_name: Name of the collection
+
+    Returns:
+        Collection: ChromaDB collection instance
+
+    Raises:
+        RuntimeError: If collection creation/retrieval fails
     """
-    collection = client.get_or_create_collection(
-        name=collection_name,
-        metadata={"hnsw:space": "cosine"},
-    )
-    logger.info(
-        "Collection '{}' ready ({} existing vectors)",
-        collection_name,
-        collection.count(),
-    )
-    return collection
+    try:
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        logger.info(
+            "Collection '{}' ready ({} existing vectors)",
+            collection_name,
+            collection.count(),
+        )
+        return collection
+    except Exception as e:
+        logger.error("Failed to create/retrieve collection '{}': {}", collection_name, str(e))
+        raise RuntimeError(f"Collection operation failed: {e}") from e
 
 
 # ---------------------------------------------------------------------------
@@ -86,14 +110,25 @@ def upsert_documents(
     batch_size: int = 64,
 ) -> int:
     """
-    Embed and upsert *documents* into ChromaDB.
+    Embed and upsert documents into ChromaDB.
 
     Uses chunk_id from document metadata as the ChromaDB document ID so
     re-ingesting the same content is idempotent.
 
-    Returns the number of documents successfully upserted.
+    Args:
+        documents: List of LangChain Document objects to upsert
+        collection_name: ChromaDB collection name (defaults to settings)
+        batch_size: Number of documents to process per batch (default: 64)
+
+    Returns:
+        int: Number of documents successfully upserted
+
+    Raises:
+        ValueError: If documents list is empty
+        RuntimeError: If embedding or upsert operations fail
     """
     if not documents:
+        logger.warning("No documents provided to upsert")
         return 0
 
     coll_name = collection_name or settings.collection_name
