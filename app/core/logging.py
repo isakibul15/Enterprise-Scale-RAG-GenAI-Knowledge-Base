@@ -10,6 +10,14 @@ _LOG_DIR.mkdir(exist_ok=True)
 
 
 def configure_logging() -> None:
+    """
+    Configure loguru for the application.
+
+    Sets up three logging streams:
+    - Console: Human-readable colored output to stdout
+    - Daily log file: Rotating JSON file for log aggregation (30-day retention)
+    - Error log: Dedicated error-only file for alerting (60-day retention)
+    """
     logger.remove()  # drop default stderr sink
 
     fmt = (
