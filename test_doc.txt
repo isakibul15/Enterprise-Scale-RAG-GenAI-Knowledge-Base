@@ -1,0 +1,8 @@
+Company Policy on Remote Work
+
+Employees may work remotely up to 3 days per week.
+All remote workers must be available between 10am and 3pm local time.
+VPN is required when accessing internal systems remotely.
+Remote work requests must be approved by direct managers.
+Equipment such as laptops will be provided by the company.
+EOF
