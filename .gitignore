@@ -45,7 +45,7 @@ logs/
 
 # HuggingFace model cache
 .cache/
-models/
+/models/
 
 # Docker
 docker-compose.override.yml
