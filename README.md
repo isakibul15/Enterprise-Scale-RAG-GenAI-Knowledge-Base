@@ -341,6 +341,19 @@ The QA chain enforces grounded answers through three independent layers:
 
 ---
 
+## Code Quality & Robustness
+
+Recent improvements focus on production-grade reliability:
+
+- **Comprehensive Error Handling** — All critical operations (embedding model loading, ChromaDB operations, vector store upserts) include try-catch blocks with contextual logging and meaningful error messages.
+- **Enhanced Type Hints** — Full type annotations across the codebase for better IDE support and type checking.
+- **Improved Documentation** — Detailed docstrings with parameter descriptions, return types, and exception documentation for all public functions.
+- **Request Validation** — Pydantic v2 models with custom validators for security (session ID sanitization, query validation) and field documentation.
+- **Structured Logging** — Request ID correlation, timing metrics, and JSONL-formatted log files for monitoring and debugging.
+- **API Middleware** — Request/response timing headers and unique request tracking for end-to-end observability.
+
+---
+
 ## License
 
 MIT © 2025 Md. Sakibul Islam
