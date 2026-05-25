@@ -88,8 +88,8 @@ export default function App() {
 
         {/* Top bar (mobile hamburger + session label) */}
         <header
-          className="flex-shrink-0 flex items-center gap-3 px-4 py-3 lg:px-6"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          className="flex-shrink-0 flex items-center gap-3 px-4 py-4 lg:px-6 lg:py-4 backdrop-blur-md"
+          style={{ borderBottom: '1px solid rgba(124,58,237,0.1)' }}
         >
           {/* Mobile menu button */}
           <button
