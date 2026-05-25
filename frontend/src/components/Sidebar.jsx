@@ -64,11 +64,11 @@ export default function Sidebar({
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <div
-        className="flex-shrink-0 px-4 py-3"
-        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+        className="flex-shrink-0 px-4 py-4 text-center"
+        style={{ borderTop: '1px solid rgba(124,58,237,0.1)' }}
       >
-        <p className="text-[10px] text-gray-700 text-center leading-relaxed">
-          Powered by LangChain · ChromaDB · Ollama
+        <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
+          Powered by <span className="text-violet-400">LangChain</span> · <span className="text-violet-400">ChromaDB</span> · <span className="text-violet-400">Ollama</span>
         </p>
       </div>
     </aside>
