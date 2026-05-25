@@ -52,13 +52,13 @@ const components = {
     }
 
     return (
-      <div className="group relative my-3">
+      <div className="group relative my-4">
         {/* Language + copy header */}
         <div
-          className="flex items-center justify-between px-3 py-1.5 rounded-t-lg"
-          style={{ background: '#0A0E1A', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          className="flex items-center justify-between px-4 py-2 rounded-t-lg font-medium"
+          style={{ background: '#0A0E1A', borderBottom: '1px solid rgba(124,58,237,0.2)' }}
         >
-          <span className="text-[10px] font-medium uppercase tracking-widest text-gray-600">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400">
             {lang || 'code'}
           </span>
           <CopyButton text={code} />
@@ -71,10 +71,10 @@ const components = {
             margin: 0,
             borderRadius: '0 0 8px 8px',
             background: '#070B14',
-            border: '1px solid rgba(255,255,255,0.07)',
+            border: '1px solid rgba(124,58,237,0.15)',
             borderTop: 'none',
-            fontSize: '0.82em',
-            padding: '0.85rem 1rem',
+            fontSize: '0.85em',
+            padding: '1rem 1rem',
           }}
           {...props}
         >
