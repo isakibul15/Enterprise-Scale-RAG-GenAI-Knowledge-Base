@@ -32,11 +32,13 @@ function EmptyState({ onSuggestion }) {
         />
       </div>
 
-      <h2 className="text-xl font-semibold text-gray-200 mb-1.5">
+      <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-400 mb-2">
         Enterprise Knowledge Base
       </h2>
-      <p className="text-sm text-gray-500 mb-8 max-w-sm leading-relaxed">
+      <p className="text-sm text-gray-400 mb-10 max-w-sm leading-relaxed font-medium">
         Upload documents using the sidebar, then ask anything.
+      </p>
+      <p className="text-xs text-gray-600 mb-8 max-w-sm leading-relaxed">
         Every answer is grounded in your data with source citations.
       </p>
 
