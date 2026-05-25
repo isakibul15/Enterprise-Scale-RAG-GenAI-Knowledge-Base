@@ -110,14 +110,17 @@ export default function MessageBubble({ role, content, isStreaming = false }) {
       {/* Bubble */}
       <div
         className={`
-          max-w-[82%] rounded-2xl px-4 py-3
+          max-w-[82%] rounded-2xl px-5 py-3.5
           ${isUser
-            ? 'bg-violet-600/10 border border-violet-600/20 text-gray-200 rounded-tr-sm'
-            : 'bg-white/[0.03] border border-white/[0.07] rounded-tl-sm'
+            ? 'bg-violet-600/12 border border-violet-600/25 text-gray-100 rounded-tr-sm'
+            : 'bg-white/[0.04] border border-white/[0.08] rounded-tl-sm'
           }
           ${isStreaming ? 'cursor-blink' : ''}
         `}
-        style={isUser ? { boxShadow: '0 2px 12px rgba(124,58,237,0.08)' } : {}}
+        style={isUser 
+          ? { boxShadow: '0 4px 16px rgba(124,58,237,0.12), inset 0 1px 0 rgba(255,255,255,0.05)' } 
+          : { boxShadow: '0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.03)' }
+        }
       >
         {isUser ? (
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
