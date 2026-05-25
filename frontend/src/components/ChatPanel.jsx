@@ -15,20 +15,20 @@ function EmptyState({ onSuggestion }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center select-none">
       {/* Glow orb */}
-      <div className="relative mb-6">
+      <div className="relative mb-8">
         <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          className="w-20 h-20 rounded-3xl flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.1))',
-            border: '1px solid rgba(124,58,237,0.25)',
-            boxShadow: '0 0 40px rgba(124,58,237,0.15)',
+            background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.15))',
+            border: '1.5px solid rgba(124,58,237,0.4)',
+            boxShadow: '0 0 60px rgba(124,58,237,0.25), inset 0 1px 20px rgba(255,255,255,0.1)',
           }}
         >
-          <Sparkles size={28} className="text-violet-400" />
+          <Sparkles size={32} className="text-violet-300" />
         </div>
         <div
-          className="absolute inset-0 rounded-2xl animate-pulse"
-          style={{ background: 'rgba(124,58,237,0.06)', filter: 'blur(12px)' }}
+          className="absolute inset-0 rounded-3xl animate-pulse"
+          style={{ background: 'rgba(124,58,237,0.1)', filter: 'blur(20px)' }}
         />
       </div>
 
