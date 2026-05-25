@@ -75,14 +75,15 @@ function ScrollButton({ onClick }) {
   return (
     <button
       onClick={onClick}
-      className="absolute bottom-24 right-6 z-10 p-1.5 rounded-full animate-fade-in"
+      className="absolute bottom-24 right-6 z-10 p-2.5 rounded-full animate-fade-in hover:scale-110 transition-transform duration-200"
       style={{
-        background: 'rgba(13,19,33,0.9)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        background: 'rgba(124,58,237,0.2)',
+        border: '1px solid rgba(124,58,237,0.3)',
         backdropFilter: 'blur(8px)',
+        boxShadow: '0 4px 16px rgba(124,58,237,0.15)',
       }}
     >
-      <ChevronDown size={14} className="text-gray-400" />
+      <ChevronDown size={16} className="text-violet-300" />
     </button>
   );
 }
