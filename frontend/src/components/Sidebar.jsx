@@ -13,21 +13,21 @@ export default function Sidebar({
   return (
     <aside
       className="flex flex-col h-full w-full overflow-hidden"
-      style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
+      style={{ borderRight: '1px solid rgba(124,58,237,0.15)' }}
     >
       {/* ── Logo / Brand ─────────────────────────────────────────────── */}
       <div
-        className="flex-shrink-0 flex items-center gap-3 px-5 py-4"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        className="flex-shrink-0 flex items-center gap-3 px-5 py-5"
+        style={{ borderBottom: '1px solid rgba(124,58,237,0.1)' }}
       >
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{
             background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
-            boxShadow: '0 0 16px rgba(124,58,237,0.4)',
+            boxShadow: '0 0 20px rgba(124,58,237,0.5), inset 0 1px 1px rgba(255,255,255,0.2)',
           }}
         >
-          <Brain size={16} className="text-white" />
+          <Brain size={18} className="text-white" />
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-100 leading-tight truncate">
