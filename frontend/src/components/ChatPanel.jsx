@@ -41,23 +41,23 @@ function EmptyState({ onSuggestion }) {
       </p>
 
       {/* Suggestion chips */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
         {suggestions.map((s, i) => (
           <button
             key={i}
             onClick={() => onSuggestion(s)}
-            className="text-left text-xs text-gray-400 hover:text-gray-200 px-3.5 py-2.5 rounded-xl transition-all duration-150"
+            className="text-left text-xs text-gray-400 hover:text-gray-200 px-4 py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
             style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(124,58,237,0.08)';
-              e.currentTarget.style.borderColor = 'rgba(124,58,237,0.2)';
+              e.currentTarget.style.background = 'rgba(124,58,237,0.12)';
+              e.currentTarget.style.borderColor = 'rgba(124,58,237,0.25)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
             }}
           >
             {s}
