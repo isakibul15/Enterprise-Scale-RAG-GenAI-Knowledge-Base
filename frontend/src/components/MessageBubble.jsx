@@ -38,11 +38,11 @@ const components = {
     if (inline) {
       return (
         <code
-          className="px-1.5 py-0.5 rounded-md text-[0.82em] font-mono"
+          className="px-2 py-1 rounded-md text-[0.85em] font-mono font-medium"
           style={{
-            background: 'rgba(124,58,237,0.15)',
-            border: '1px solid rgba(124,58,237,0.2)',
-            color: '#C4B5FD',
+            background: 'rgba(124,58,237,0.2)',
+            border: '1px solid rgba(124,58,237,0.3)',
+            color: '#DDD6FE',
           }}
           {...props}
         >
