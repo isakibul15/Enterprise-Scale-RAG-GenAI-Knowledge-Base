@@ -46,17 +46,50 @@ from app.retrieval.prompts import CONDENSE_PROMPT, QA_PROMPT, format_retrieved_d
 from app.retrieval.retriever import get_retriever
 
 # ---------------------------------------------------------------------------
-# In-process session store (replace with RedisMessageHistory for multi-pod)
+# In-process session store with LRU cache + TTL (replace with Redis for multi-pod)
 # ---------------------------------------------------------------------------
 
-_SESSION_STORE: dict[str, ChatMessageHistory] = {}
+# LRU session store with automatic eviction when max_size exceeded
+# TTL_SECONDS: sessions older than this are automatically evicted
+_SESSION_STORE: dict[str, tuple[ChatMessageHistory, float]] = {}
+_MAX_SESSIONS = 1000  # LRU limit: max concurrent sessions in memory
+_SESSION_TTL_SECONDS = 86400  # 24h TTL: sessions auto-evict after 24h of last access
+
+
+def _evict_expired_sessions() -> None:
+    """Remove sessions older than TTL_SECONDS. Called before each access."""
+    current_time = time.time()
+    expired = [
+        sid for sid, (_, timestamp) in _SESSION_STORE.items()
+        if current_time - timestamp > _SESSION_TTL_SECONDS
+    ]
+    for sid in expired:
+        _SESSION_STORE.pop(sid)
+        logger.debug("Auto-evicted expired session: {}", sid)
+
+
+def _evict_lru_session() -> None:
+    """Remove least-recently-used session when max_size exceeded."""
+    if len(_SESSION_STORE) >= _MAX_SESSIONS:
+        # Find LRU (oldest timestamp)
+        lru_sid = min(_SESSION_STORE.keys(), key=lambda s: _SESSION_STORE[s][1])
+        _SESSION_STORE.pop(lru_sid)
+        logger.debug("LRU evicted session: {}", lru_sid)
 
 
 def _get_session_history(session_id: str) -> BaseChatMessageHistory:
+    _evict_expired_sessions()
+    _evict_lru_session()
+    
     if session_id not in _SESSION_STORE:
-        _SESSION_STORE[session_id] = ChatMessageHistory()
+        _SESSION_STORE[session_id] = (ChatMessageHistory(), time.time())
         logger.debug("New chat session: {}", session_id)
-    return _SESSION_STORE[session_id]
+    else:
+        # Update access timestamp for LRU tracking
+        history, _ = _SESSION_STORE[session_id]
+        _SESSION_STORE[session_id] = (history, time.time())
+    
+    return _SESSION_STORE[session_id][0]
 
 
 def clear_session(session_id: str) -> None:
@@ -66,6 +99,7 @@ def clear_session(session_id: str) -> None:
 
 
 def list_sessions() -> list[str]:
+    _evict_expired_sessions()
     return list(_SESSION_STORE.keys())
 
 
