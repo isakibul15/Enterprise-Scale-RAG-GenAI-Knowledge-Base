@@ -67,10 +67,29 @@ class IngestionResult:
 
 
 # ---------------------------------------------------------------------------
-# Parent docstore helpers
+# Parent docstore helpers (cached singleton to avoid repeated file I/O)
 # ---------------------------------------------------------------------------
 
+_PARENT_STORE_CACHE: dict | None = None
+
+
+def get_parent_store() -> dict:
+    """
+    Return the cached parent store.
+    
+    Loads from disk on first call and caches in memory.
+    Use this instead of _load_parent_store() to avoid repeated I/O.
+    """
+    global _PARENT_STORE_CACHE
+    if _PARENT_STORE_CACHE is None:
+        logger.info("Loading parent store from disk…")
+        _PARENT_STORE_CACHE = _load_parent_store()
+        logger.info("Parent store loaded: {} entries", len(_PARENT_STORE_CACHE))
+    return _PARENT_STORE_CACHE
+
+
 def _load_parent_store() -> dict:
+    """Load parent store from disk (internal)."""
     if _PARENT_STORE_PATH.exists():
         with _PARENT_STORE_PATH.open("r", encoding="utf-8") as f:
             return json.load(f)
@@ -78,9 +97,13 @@ def _load_parent_store() -> dict:
 
 
 def _save_parent_store(store: dict) -> None:
+    """Save parent store to disk and update cache."""
+    global _PARENT_STORE_CACHE
     _PARENT_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _PARENT_STORE_PATH.open("w", encoding="utf-8") as f:
         json.dump(store, f, ensure_ascii=False, indent=2)
+    # Invalidate cache so next access reloads
+    _PARENT_STORE_CACHE = store
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +226,7 @@ class IngestionPipeline:
         _upsert_with_retry(split.child_chunks, self._collection)
 
         # --- persist parent chunks to local JSON docstore ---
-        parent_store = _load_parent_store()
+        parent_store = get_parent_store()
         for parent in split.parent_chunks:
             pid = parent.metadata["chunk_id"]
             parent_store[pid] = {
