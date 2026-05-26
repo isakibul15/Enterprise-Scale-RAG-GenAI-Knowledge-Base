@@ -32,6 +32,9 @@ from app.retrieval.vector_store import delete_by_source, upsert_documents
 # JSON file used as a lightweight parent-chunk docstore (Milestone 3 reads this)
 _PARENT_STORE_PATH = Path("data/processed/parent_store.json")
 
+# JSON file tracking file hashes to skip re-embedding unchanged files
+_FILE_HASH_REGISTRY_PATH = Path("data/processed/file_hash_registry.json")
+
 
 # ---------------------------------------------------------------------------
 # Result dataclass
@@ -104,6 +107,34 @@ def _save_parent_store(store: dict) -> None:
         json.dump(store, f, ensure_ascii=False, indent=2)
     # Invalidate cache so next access reloads
     _PARENT_STORE_CACHE = store
+
+
+def _load_file_hash_registry() -> dict:
+    """Load file hash registry from disk (internal). Format: {source_path: file_hash}"""
+    if _FILE_HASH_REGISTRY_PATH.exists():
+        with _FILE_HASH_REGISTRY_PATH.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_file_hash_registry(registry: dict) -> None:
+    """Save file hash registry to disk."""
+    _FILE_HASH_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _FILE_HASH_REGISTRY_PATH.open("w", encoding="utf-8") as f:
+        json.dump(registry, f, ensure_ascii=False, indent=2)
+
+
+def is_file_already_ingested(source_path: str, file_hash: str) -> bool:
+    """Check if a file with the same hash has already been ingested. Skip if yes."""
+    registry = _load_file_hash_registry()
+    return registry.get(source_path) == file_hash
+
+
+def register_ingested_file(source_path: str, file_hash: str) -> None:
+    """Register a file as ingested by storing its hash."""
+    registry = _load_file_hash_registry()
+    registry[source_path] = file_hash
+    _save_file_hash_registry(registry)
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +236,15 @@ class IngestionPipeline:
             logger.warning("No content extracted from '{}' — skipping", file_path.name)
             result.failed_files.append(str(file_path))
             return
+        
+        # Check if file has already been ingested with same hash (deduplication)
+        source = str(file_path.resolve())
+        file_hash = docs[0].metadata.get("file_hash", "")
+        if is_file_already_ingested(source, file_hash):
+            logger.info("File '{}' already ingested (hash match) — skipping", file_path.name)
+            result.successful_files.append(source)  # Count as successful but skip processing
+            return
+        
         self._process_docs(file_path, docs, result)
 
     def _process_docs(self, file_path: Path, docs, result: IngestionResult) -> None:
@@ -234,6 +274,10 @@ class IngestionPipeline:
                 "metadata": parent.metadata,
             }
         _save_parent_store(parent_store)
+
+        # --- register file hash to skip re-ingestion of unchanged files ---
+        file_hash = docs[0].metadata.get("file_hash", "")
+        register_ingested_file(source, file_hash)
 
         result.successful_files.append(source)
         result.total_child_chunks += len(split.child_chunks)
