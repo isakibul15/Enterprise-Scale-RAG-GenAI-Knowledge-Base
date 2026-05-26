@@ -253,3 +253,65 @@ def get_langchain_vector_store(
     )
     logger.info("LangChain Chroma store ready (collection='{}')", coll_name)
     return store
+
+
+# ---------------------------------------------------------------------------
+# Filtered search (metadata filtering support)
+# ---------------------------------------------------------------------------
+
+def search_with_metadata_filter(
+    query: str,
+    k: int = 6,
+    collection_name: str | None = None,
+    where_filter: dict | None = None,
+) -> list[Document]:
+    """
+    Search documents by semantic similarity with optional metadata filtering.
+    
+    Args:
+        query: Search query text.
+        k: Number of results to return.
+        collection_name: ChromaDB collection name.
+        where_filter: ChromaDB where filter dict. Examples:
+            {"source": "path/to/file.pdf"}
+            {"file_type": "pdf"}
+            {"$or": [{"file_type": "pdf"}, {"file_type": "txt"}]}
+    
+    Returns:
+        List of matching Document objects.
+    """
+    coll_name = collection_name or settings.collection_name
+    client = get_chroma_client()
+    collection = get_or_create_collection(client, coll_name)
+    embed_model = get_embedding_model()
+    
+    # Embed query
+    query_vector = embed_model.embed_query(query)
+    
+    # Query with optional filter
+    try:
+        results = collection.query(
+            query_embeddings=[query_vector],
+            n_results=k,
+            where=where_filter,
+        )
+        
+        # Convert ChromaDB results to LangChain Documents
+        documents = []
+        if results["ids"] and results["ids"][0]:
+            for idx, doc_id in enumerate(results["ids"][0]):
+                doc_text = results["documents"][0][idx]
+                metadata = results["metadatas"][0][idx]
+                documents.append(Document(page_content=doc_text, metadata=metadata))
+        
+        logger.debug(
+            "Metadata-filtered search: {} results for query '{}' | filter={}",
+            len(documents),
+            query[:80],
+            where_filter,
+        )
+        return documents
+    except Exception as exc:
+        logger.warning("Metadata-filtered search failed: {} | filter={}", exc, where_filter)
+        # Fallback to unfiltered search
+        return get_langchain_vector_store(coll_name).similarity_search(query, k=k)
