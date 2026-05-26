@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("./data/uploads")
     max_upload_size_mb: int = Field(50, gt=0)
 
+    # Performance & Concurrency
+    max_concurrent_embeddings: int = Field(4, gt=0)  # Thread pool size for parallel embedding
+    connection_pool_size: int = Field(10, gt=0)  # Max concurrent database connections
+    request_timeout_seconds: int = Field(30, gt=0)  # Request timeout for external APIs
+
     @field_validator("chunk_overlap")
     @classmethod
     def overlap_less_than_chunk(cls, v: int, info) -> int:

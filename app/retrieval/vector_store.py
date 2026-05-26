@@ -5,11 +5,12 @@ ChromaDB runs embedded inside the process — no separate server required.
 Data is persisted automatically to CHROMA_PERSIST_DIR on every write.
 
 Handles:
-  - PersistentClient creation (one per process)
+  - PersistentClient creation (one per process) with connection pooling
   - Collection bootstrap with cosine distance
   - Idempotent upsert of LangChain Documents (chunk_id as Chroma ID)
   - Delete-by-source for re-ingestion workflows
   - LangChain-compatible Chroma accessor for the retriever / QA chain
+  - Metadata-filtered searches for efficient retrieval
 
 ChromaDB upsert semantics: if a document with the same ID already exists,
 it is overwritten. Re-ingesting the same file therefore produces zero duplicates
@@ -17,6 +18,7 @@ as long as chunk_ids are stable (they are — see splitter.py).
 """
 
 from functools import lru_cache
+import threading
 
 import chromadb
 from chromadb import Collection
@@ -29,6 +31,9 @@ from app.ingestion.embedder import get_embedding_dimension, get_embedding_model
 
 # ChromaDB payload key that stores the raw document text
 CONTENT_FIELD = "page_content"
+
+# Connection pool semaphore for limiting concurrent database access
+_CONNECTION_POOL_SEMAPHORE = threading.Semaphore(settings.connection_pool_size)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +115,7 @@ def upsert_documents(
     batch_size: int = 64,
 ) -> int:
     """
-    Embed and upsert documents into ChromaDB.
+    Embed and upsert documents into ChromaDB with connection pooling.
 
     Uses chunk_id from document metadata as the ChromaDB document ID so
     re-ingesting the same content is idempotent.
@@ -132,58 +137,65 @@ def upsert_documents(
         return 0
 
     coll_name = collection_name or settings.collection_name
-    client = get_chroma_client()
-    collection = get_or_create_collection(client, coll_name)
-    embed_model = get_embedding_model()
+    
+    # Acquire connection from pool to limit concurrent database access
+    _CONNECTION_POOL_SEMAPHORE.acquire()
+    try:
+        client = get_chroma_client()
+        collection = get_or_create_collection(client, coll_name)
+        embed_model = get_embedding_model()
 
-    texts = [doc.page_content for doc in documents]
-    total_upserted = 0
+        texts = [doc.page_content for doc in documents]
+        total_upserted = 0
 
-    for batch_start in range(0, len(texts), batch_size):
-        batch_texts = texts[batch_start : batch_start + batch_size]
-        batch_docs = documents[batch_start : batch_start + batch_size]
+        for batch_start in range(0, len(texts), batch_size):
+            batch_texts = texts[batch_start : batch_start + batch_size]
+            batch_docs = documents[batch_start : batch_start + batch_size]
 
-        try:
-            vectors = embed_model.embed_documents(batch_texts)
-        except Exception as exc:
-            logger.error(
-                "Embedding failed for batch [{}-{}]: {}",
-                batch_start,
-                batch_start + len(batch_texts),
-                exc,
-            )
-            raise
+            try:
+                vectors = embed_model.embed_documents(batch_texts)
+            except Exception as exc:
+                logger.error(
+                    "Embedding failed for batch [{}-{}]: {}",
+                    batch_start,
+                    batch_start + len(batch_texts),
+                    exc,
+                )
+                raise
 
-        ids = [doc.metadata["chunk_id"] for doc in batch_docs]
+            ids = [doc.metadata["chunk_id"] for doc in batch_docs]
 
-        # Flatten metadata: ChromaDB only accepts str / int / float / bool values.
-        # Any complex types (lists, dicts, None) are cast to strings.
-        metadatas = [_sanitise_metadata(doc.metadata) for doc in batch_docs]
+            # Flatten metadata: ChromaDB only accepts str / int / float / bool values.
+            # Any complex types (lists, dicts, None) are cast to strings.
+            metadatas = [_sanitise_metadata(doc.metadata) for doc in batch_docs]
 
-        try:
-            collection.upsert(
-                ids=ids,
-                embeddings=vectors,
-                documents=batch_texts,
-                metadatas=metadatas,
-            )
-            total_upserted += len(ids)
-            logger.debug(
-                "Upserted batch [{}-{}] ({} docs)",
-                batch_start,
-                batch_start + len(ids),
-                len(ids),
-            )
-        except Exception as exc:
-            logger.error("ChromaDB upsert failed: {}", exc)
-            raise
+            try:
+                collection.upsert(
+                    ids=ids,
+                    embeddings=vectors,
+                    documents=batch_texts,
+                    metadatas=metadatas,
+                )
+                total_upserted += len(ids)
+                logger.debug(
+                    "Upserted batch [{}-{}] ({} docs)",
+                    batch_start,
+                    batch_start + len(ids),
+                    len(ids),
+                )
+            except Exception as exc:
+                logger.error("ChromaDB upsert failed: {}", exc)
+                raise
 
-    logger.info(
-        "Upserted {} document(s) into collection '{}'",
-        total_upserted,
-        coll_name,
-    )
-    return total_upserted
+        logger.info(
+            "Upserted {} document(s) into collection '{}'",
+            total_upserted,
+            coll_name,
+        )
+        return total_upserted
+    finally:
+        # Release connection back to pool
+        _CONNECTION_POOL_SEMAPHORE.release()
 
 
 def _sanitise_metadata(metadata: dict) -> dict:
