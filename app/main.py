@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app.api.middleware.logging import RequestLoggingMiddleware
+from app.api.middleware.performance import PerformanceMonitoringMiddleware
 from app.api.routes import health, query, upload
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -102,7 +103,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # 2. Request logging + X-Request-ID injection
+    # 2. Performance monitoring — tracks latencies, cache hits, endpoint stats
+    app.add_middleware(PerformanceMonitoringMiddleware)
+
+    # 3. Request logging + X-Request-ID injection
     app.add_middleware(RequestLoggingMiddleware)
 
     # ── Global exception handlers ─────────────────────────────────────────────

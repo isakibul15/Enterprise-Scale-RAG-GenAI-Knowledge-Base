@@ -123,6 +123,7 @@ class RAGResponse:
     session_id: str = ""
     latency_ms: float = 0.0
     retrieved_chunks: int = 0
+    cache_hit: bool = False  # True if answer came from query cache
 
 
 # ---------------------------------------------------------------------------
@@ -234,8 +235,10 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
     cache_key = _query_cache_key(question, session_id)
     _evict_expired_queries()
     if cache_key in _QUERY_CACHE:
+        cached_response = _QUERY_CACHE[cache_key]
+        cached_response.cache_hit = True
         logger.debug("Query cache HIT | session={} | question='{}'", session_id, question[:120])
-        return _QUERY_CACHE[cache_key]
+        return cached_response
 
     chain = _get_rag_chain()
     t0 = time.perf_counter()

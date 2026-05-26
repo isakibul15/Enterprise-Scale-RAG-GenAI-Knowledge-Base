@@ -19,6 +19,7 @@ from loguru import logger
 from app.models.requests import ClearSessionRequest, QueryRequest
 from app.models.responses import ErrorResponse, QueryResponse, SourceDocumentSchema
 from app.retrieval.chain import RAGResponse, ask, clear_session, list_sessions, stream_ask
+from app.api.middleware.performance import _metrics
 
 router = APIRouter()
 
@@ -58,6 +59,13 @@ async def query(request: QueryRequest) -> QueryResponse:
             request.question,
             request.session_id,
         )
+        
+        # Track cache hit/miss in metrics
+        if result.cache_hit:
+            _metrics.record_cache_hit()
+        else:
+            _metrics.record_cache_miss()
+            
     except Exception as exc:
         logger.exception("Query failed: {}", exc)
         raise HTTPException(
