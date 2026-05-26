@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Embedding
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_device: str = "cpu"
-    embedding_batch_size: int = Field(32, gt=0, le=512)
+    embedding_batch_size: int = Field(64, gt=0, le=512)  # Aligned with ChromaDB upsert batch
 
     # LLM
     llm_provider: LLMProvider = LLMProvider.ollama
