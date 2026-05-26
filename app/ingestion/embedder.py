@@ -4,9 +4,13 @@ Embedding model singleton.
 Uses HuggingFaceEmbeddings (sentence-transformers backend).
 BGE models require normalize_embeddings=True for cosine similarity to be meaningful.
 The singleton is lazy-loaded on first access to avoid GPU/CPU allocation at import time.
+
+Supports batch embedding with parallel processing for faster ingestion.
 """
 
+import asyncio
 from functools import lru_cache
+from typing import AsyncIterator
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from loguru import logger
@@ -73,3 +77,40 @@ def get_embedding_dimension() -> int:
     except Exception as e:
         logger.error("Failed to detect embedding dimension: {}", str(e))
         raise RuntimeError(f"Embedding dimension detection failed: {e}") from e
+
+
+async def embed_documents_parallel(texts: list[str], batch_size: int | None = None) -> list[list[float]]:
+    """
+    Embed a list of texts in parallel batches for faster ingestion.
+    
+    Args:
+        texts: List of text documents to embed.
+        batch_size: Batch size for parallel processing. Defaults to settings.embedding_batch_size.
+    
+    Returns:
+        List of embedding vectors.
+    """
+    model = get_embedding_model()
+    if batch_size is None:
+        batch_size = settings.embedding_batch_size
+    
+    # Process in parallel batches using asyncio + thread pool
+    def embed_batch(batch: list[str]) -> list[list[float]]:
+        return model.embed_documents(batch)
+    
+    loop = asyncio.get_event_loop()
+    batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+    
+    logger.info("Parallel embedding: {} texts in {} batches", len(texts), len(batches))
+    
+    # Run all batches in parallel using thread pool executor
+    tasks = [loop.run_in_executor(None, embed_batch, batch) for batch in batches]
+    results = await asyncio.gather(*tasks)
+    
+    # Flatten results from batches
+    embeddings = []
+    for batch_result in results:
+        embeddings.extend(batch_result)
+    
+    logger.info("Parallel embedding complete: {} vectors generated", len(embeddings))
+    return embeddings
