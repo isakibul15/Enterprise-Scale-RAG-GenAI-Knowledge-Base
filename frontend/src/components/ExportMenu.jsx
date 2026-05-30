@@ -1,6 +1,6 @@
-import { Download, FileText, Code2, File } from 'lucide-react';
+import { Download, FileText, FileJson, File } from 'lucide-react';
 import { useState, useRef } from 'react';
-import { exportChatAsTxt, exportChatAsJson, exportChatAsHtml } from '../utils/exportChat';
+import { exportChatAsTxt, exportChatAsJson, exportChatAsHtml, exportChatAsPdf } from '../utils/exportChat';
 import { useToast } from './Toast';
 
 export function ExportMenu({ messages, sessionId }) {
@@ -28,6 +28,10 @@ export function ExportMenu({ messages, sessionId }) {
           exportChatAsHtml(messages, sessionId);
           toast('Chat exported as HTML', 'success', 3000);
           break;
+        case 'pdf':
+          await exportChatAsPdf(messages, sessionId);
+          toast('Chat exported as PDF', 'success', 3000);
+          break;
       }
       setOpen(false);
     } catch (err) {
@@ -50,31 +54,62 @@ export function ExportMenu({ messages, sessionId }) {
         <div
           className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-50 animate-fade-in"
           style={{
-            background: 'rgba(30, 27, 50, 0.95)',
-            border: '1px solid rgba(124, 58, 237, 0.2)',
+            background: 'var(--menu-bg)',
+            border: '1px solid var(--menu-border)',
             backdropFilter: 'blur(12px)',
+            color: 'var(--menu-text)',
           }}
         >
           <button
             onClick={() => handleExport('txt')}
-            className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-sm text-gray-300 hover:text-gray-100 border-b border-white/5"
+            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm border-b"
+            style={{
+              color: 'var(--menu-text)',
+              borderColor: 'rgba(255, 255, 255, 0.05)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             <FileText size={14} className="text-violet-400" />
             <span>Export as TXT</span>
           </button>
           <button
             onClick={() => handleExport('json')}
-            className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-sm text-gray-300 hover:text-gray-100 border-b border-white/5"
+            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm border-b"
+            style={{
+              color: 'var(--menu-text)',
+              borderColor: 'rgba(255, 255, 255, 0.05)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            <Code2 size={14} className="text-blue-400" />
+            <FileJson size={14} className="text-blue-400" />
             <span>Export as JSON</span>
           </button>
           <button
             onClick={() => handleExport('html')}
-            className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2 text-sm text-gray-300 hover:text-gray-100"
+            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm border-b"
+            style={{
+              color: 'var(--menu-text)',
+              borderColor: 'rgba(255, 255, 255, 0.05)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             <File size={14} className="text-green-400" />
             <span>Export as HTML</span>
+          </button>
+          <button
+            onClick={() => handleExport('pdf')}
+            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm"
+            style={{
+              color: 'var(--menu-text)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <File size={14} className="text-red-400" />
+            <span>Export as PDF</span>
           </button>
         </div>
       )}
