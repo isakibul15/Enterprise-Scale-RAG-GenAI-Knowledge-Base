@@ -11,12 +11,27 @@
     overflow: hidden;
   }
 
+  /* Dark theme (default) */
   body {
     background-color: #0B0F19;
     color: #F9FAFB;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Light theme */
+  [data-theme="light"] body {
+    background-color: #F9FAFB;
+    color: #111827;
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
   }
 
   /* Subtle noise texture over the background */
@@ -44,6 +59,15 @@
     border-radius: 2px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #2a3f5f; }
+
+  /* Light mode scrollbar */
+  [data-theme="light"] .scrollbar-thin {
+    scrollbar-color: #d1d5db transparent;
+  }
+  [data-theme="light"] .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+  [data-theme="light"] .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 }
 
 /* ── Glassmorphism card ─────────────────────────────────────────────────── */
@@ -55,6 +79,12 @@
     border: 1px solid rgba(255, 255, 255, 0.07);
   }
 
+  /* Light mode glass */
+  [data-theme="light"] .glass {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
   .glass-hover {
     @apply glass transition-all duration-200;
   }
@@ -63,12 +93,22 @@
     border-color: rgba(255, 255, 255, 0.12);
   }
 
+  [data-theme="light"] .glass-hover:hover {
+    background: rgba(245, 245, 245, 0.95);
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+
   /* Gradient border trick */
   .gradient-border {
     position: relative;
     background: #0D1321;
     border-radius: 12px;
   }
+
+  [data-theme="light"] .gradient-border {
+    background: #FFFFFF;
+  }
+
   .gradient-border::before {
     content: '';
     position: absolute;
@@ -163,4 +203,146 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  /* ── LIGHT MODE OVERRIDES ─────────────────────────────────────────────── */
+  
+  /* Chat input area light mode */
+  [data-theme="light"] .chat-input-area {
+    background: rgba(243, 244, 246, 0.95) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Header */
+  [data-theme="light"] header {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Header text */
+  [data-theme="light"] header h1,
+  [data-theme="light"] header p {
+    color: #1F2937 !important;
+  }
+
+  [data-theme="light"] header p {
+    color: #6B7280 !important;
+  }
+
+  /* Sidebar */
+  [data-theme="light"] aside {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  }
+
+  [data-theme="light"] aside p,
+  [data-theme="light"] aside span,
+  [data-theme="light"] aside h1,
+  [data-theme="light"] aside h2 {
+    color: #1F2937 !important;
+  }
+
+  [data-theme="light"] aside .text-gray-500,
+  [data-theme="light"] aside .text-gray-600 {
+    color: #6B7280 !important;
+  }
+
+  /* Chat input area */
+  [data-theme="light"] [style*="border-top"] {
+    border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Input field */
+  [data-theme="light"] textarea {
+    background: transparent !important;
+    color: #1F2937 !important;
+  }
+
+  [data-theme="light"] textarea::placeholder {
+    color: #9CA3AF !important;
+  }
+
+  [data-theme="light"] input {
+    background: transparent !important;
+    color: #1F2937 !important;
+  }
+
+  [data-theme="light"] input::placeholder {
+    color: #9CA3AF !important;
+  }
+
+  /* Chat container backgrounds */
+  [data-theme="light"] main {
+    background: #FFFFFF !important;
+  }
+
+  /* Text colors - various elements */
+  [data-theme="light"] .text-gray-100,
+  [data-theme="light"] .text-gray-200,
+  [data-theme="light"] .text-gray-300,
+  [data-theme="light"] .text-gray-400 {
+    color: #374151 !important;
+  }
+
+  [data-theme="light"] .text-gray-500,
+  [data-theme="light"] .text-gray-600 {
+    color: #6B7280 !important;
+  }
+
+  [data-theme="light"] .text-gray-700 {
+    color: #111827 !important;
+  }
+
+  /* Message bubbles light mode */
+  [data-theme="light"] .prose-dark {
+    color: #1F2937 !important;
+  }
+
+  [data-theme="light"] .prose-dark p,
+  [data-theme="light"] .prose-dark li,
+  [data-theme="light"] .prose-dark span {
+    color: #374151 !important;
+  }
+
+  [data-theme="light"] .prose-dark h1,
+  [data-theme="light"] .prose-dark h2,
+  [data-theme="light"] .prose-dark h3 {
+    color: #111827 !important;
+  }
+
+  [data-theme="light"] .prose-dark a {
+    color: #2563EB !important;
+  }
+
+  [data-theme="light"] .prose-dark code {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #111827 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  }
+
+  [data-theme="light"] .prose-dark pre {
+    background: #F3F4F6 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Buttons in light mode */
+  [data-theme="light"] button:not(.btn-send) {
+    color: #374151 !important;
+  }
+
+  [data-theme="light"] button:hover:not(.btn-send) {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    color: #1F2937 !important;
+  }
+
+  /* Borders and separators */
+  [data-theme="light"] [style*="border"] {
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Dividers */
+  [data-theme="light"] hr {
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
 }
+

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
 import { uploadFile } from '../api/client';
+import { useToast } from './Toast';
 
 const ACCEPTED = ['.pdf','.docx','.doc','.txt','.md','.html','.htm','.csv'];
 const MAX_MB   = 50;
@@ -17,6 +18,7 @@ export default function UploadZone({ onSuccess }) {
   const [progress,  setProgress]  = useState(0);
   const [uploading, setUploading] = useState(false);
   const [result,    setResult]    = useState(null);   // { ok, message }
+  const { show: toast } = useToast();
   const inputRef = useRef(null);
 
   const validate = (f) => {
@@ -53,15 +55,19 @@ export default function UploadZone({ onSuccess }) {
 
     try {
       const data = await uploadFile(file, { onProgress: setProgress });
+      const successMsg = `✓ ${data.total_child_chunks} chunks ingested in ${data.duration_seconds}s`;
       setResult({
         ok: true,
-        message: `✓ ${data.total_child_chunks} chunks ingested in ${data.duration_seconds}s`,
+        message: successMsg,
       });
+      toast(successMsg, 'success', 4000);
       onSuccess?.(data);
       setFile(null);
       if (inputRef.current) inputRef.current.value = '';
     } catch (err) {
-      setResult({ ok: false, message: err.message });
+      const errorMsg = err.message || 'Upload failed';
+      setResult({ ok: false, message: errorMsg });
+      toast(errorMsg, 'error', 4000);
     } finally {
       setUploading(false);
       setProgress(0);

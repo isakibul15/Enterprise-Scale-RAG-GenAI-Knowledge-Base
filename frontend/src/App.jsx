@@ -1,7 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import { Menu, X } from 'lucide-react';
-import Sidebar   from './components/Sidebar';
-import ChatPanel from './components/ChatPanel';
+import Sidebar        from './components/Sidebar';
+import ChatPanel      from './components/ChatPanel';
+import { ToastContainer } from './components/Toast';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { ThemeToggle } from './components/ThemeToggle';
+import { ExportMenu } from './components/ExportMenu';
 
 function generateSessionId() {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -54,15 +58,19 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-full w-full overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
+    <>
+      <ToastContainer />
+      <ConfirmDialog />
+      
+      <div className="flex h-full w-full overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
 
-      {/* ── Mobile sidebar overlay ──────────────────────────────────────── */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+        {/* ── Mobile sidebar overlay ──────────────────────────────────────── */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <div
@@ -112,6 +120,12 @@ export default function App() {
             </p>
           </div>
 
+          {/* Right-side actions */}
+          <div className="flex items-center gap-2">
+            <ExportMenu messages={messages} sessionId={sessionId} />
+            <ThemeToggle />
+          </div>
+
           {/* Gradient accent line under header */}
           <div
             className="absolute left-0 bottom-0 h-[1px] w-full pointer-events-none"
@@ -133,6 +147,7 @@ export default function App() {
         </div>
 
       </main>
-    </div>
+      </div>
+    </>
   );
 }
