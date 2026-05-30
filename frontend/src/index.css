@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Dark theme (default) */
+  --menu-bg: rgba(30, 27, 50, 0.95);
+  --menu-border: rgba(124, 58, 237, 0.2);
+  --menu-text: #D1D5DB;
+  --menu-hover-bg: rgba(255, 255, 255, 0.05);
+  --menu-button-border: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] {
+  /* Light theme */
+  --menu-bg: rgba(255, 255, 255, 0.95);
+  --menu-border: rgba(0, 0, 0, 0.12);
+  --menu-text: #374151;
+  --menu-hover-bg: rgba(0, 0, 0, 0.05);
+  --menu-button-border: rgba(0, 0, 0, 0.08);
+}
+
 /* ── Base reset ─────────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
