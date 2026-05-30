@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Cpu, Copy, Check } from 'lucide-react';
+import { User, Cpu, Copy, Check, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 /* ── Copy button for code blocks ────────────────────────────────────────── */
@@ -21,6 +21,8 @@ function CopyButton({ text }) {
     <button
       onClick={handleCopy}
       className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+      aria-label={copied ? 'Copied to clipboard' : 'Copy code to clipboard'}
+      title={copied ? 'Copied!' : 'Click to copy'}
     >
       {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
       {copied ? 'Copied' : 'Copy'}
@@ -90,7 +92,11 @@ export default function MessageBubble({ role, content, isStreaming = false }) {
   const isUser = role === 'user';
 
   return (
-    <div className={`flex gap-3 animate-fade-in ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div
+      className={`flex gap-3 animate-fade-in ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+      role="article"
+      aria-label={`${isUser ? 'Your message' : 'AI response'}`}
+    >
       {/* Avatar */}
       <div
         className={`
@@ -100,6 +106,7 @@ export default function MessageBubble({ role, content, isStreaming = false }) {
             : 'bg-indigo-900/30 border border-indigo-700/30'
           }
         `}
+        aria-hidden="true"
       >
         {isUser
           ? <User size={13} className="text-violet-400" />
@@ -115,7 +122,7 @@ export default function MessageBubble({ role, content, isStreaming = false }) {
             ? 'bg-violet-600/12 border border-violet-600/25 text-gray-100 rounded-tr-sm'
             : 'bg-white/[0.04] border border-white/[0.08] rounded-tl-sm'
           }
-          ${isStreaming ? 'cursor-blink' : ''}
+          ${isStreaming ? 'animate-pulse' : ''}
         `}
         style={isUser 
           ? { boxShadow: '0 4px 16px rgba(124,58,237,0.12), inset 0 1px 0 rgba(255,255,255,0.05)' } 
@@ -130,10 +137,13 @@ export default function MessageBubble({ role, content, isStreaming = false }) {
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
                 {content}
               </ReactMarkdown>
-            ) : (
-              // Shimmer placeholder while waiting for first token
-              <span className="shimmer-text text-sm">Thinking…</span>
-            )}
+            ) : isStreaming ? (
+              // Improved loading state with icon
+              <div className="flex items-center gap-2 text-gray-400">
+                <Loader2 size={14} className="animate-spin text-violet-400" />
+                <span className="text-sm">Thinking…</span>
+              </div>
+            ) : null}
           </div>
         )}
       </div>

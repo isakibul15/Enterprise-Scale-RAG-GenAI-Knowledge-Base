@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { Send, Square, Sparkles, ChevronDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import { streamQuery } from '../api/client';
+import { useToast } from './Toast';
 
 /* ── Empty / welcome state ──────────────────────────────────────────────── */
 function EmptyState({ onSuggestion }) {
@@ -93,6 +94,7 @@ export default function ChatPanel({ sessionId, messages, onMessage, onStreamDone
   const [input,      setInput]      = useState('');
   const [streaming,  setStreaming]   = useState(false);
   const [showScroll, setShowScroll] = useState(false);
+  const { show: toast } = useToast();
   const abortRef   = useRef(null);
   const bottomRef  = useRef(null);
   const scrollRef  = useRef(null);
@@ -162,18 +164,20 @@ export default function ChatPanel({ sessionId, messages, onMessage, onStreamDone
           onStreamDone?.();
         },
         onError: (err) => {
+          const errorMsg = typeof err === 'string' ? err : err?.message || 'Failed to get response';
           onMessage((prev) =>
             prev.map((m) =>
               m.id === aiId
-                ? { ...m, content: `⚠️ Error: ${err}`, streaming: false }
+                ? { ...m, content: `⚠️ Error: ${errorMsg}`, streaming: false }
                 : m
             )
           );
+          toast(errorMsg, 'error', 5000);
           setStreaming(false);
         },
       }
     );
-  }, [input, streaming, sessionId, onMessage, onStreamDone]);
+  }, [input, streaming, sessionId, onMessage, onStreamDone, toast]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -214,7 +218,7 @@ export default function ChatPanel({ sessionId, messages, onMessage, onStreamDone
         style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
       >
         <div
-          className="flex items-end gap-3 rounded-2xl px-4 py-3 transition-all duration-200"
+          className="flex items-end gap-3 rounded-2xl px-4 py-3 transition-all duration-200 chat-input-area"
           style={{
             background: 'rgba(13,19,33,0.8)',
             border: '1px solid rgba(255,255,255,0.08)',
