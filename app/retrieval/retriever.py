@@ -33,24 +33,40 @@ from app.retrieval.vector_store import get_langchain_vector_store
 
 _PARENT_STORE_PATH = Path("data/processed/parent_store.json")
 
+# Cached parent store (loaded once, reused across requests)
+_PARENT_STORE_CACHE: dict[str, Document] | None = None
+
+# Cached retriever singleton (built once, reused across requests)
+_RETRIEVER_CACHE: BaseRetriever | None = None
+
 
 # ---------------------------------------------------------------------------
-# Parent-chunk docstore (loaded once from the JSON written by the pipeline)
+# Parent-chunk docstore (loaded once, cached across requests)
 # ---------------------------------------------------------------------------
 
 def _load_parent_store() -> dict[str, Document]:
     """
     Load the JSON parent store written by IngestionPipeline into a dict.
+    
+    Cached singleton — loaded once from disk and reused. If the file is
+    modified after first load, restart the app to reload.
 
     Returns an empty dict (gracefully) if the store does not exist yet —
     the retriever will then fall back to child chunks.
     """
+    global _PARENT_STORE_CACHE
+    
+    # Return cached store if already loaded
+    if _PARENT_STORE_CACHE is not None:
+        return _PARENT_STORE_CACHE
+    
     if not _PARENT_STORE_PATH.exists():
         logger.warning(
             "Parent store not found at '{}' — falling back to child chunks",
             _PARENT_STORE_PATH,
         )
-        return {}
+        _PARENT_STORE_CACHE = {}
+        return _PARENT_STORE_CACHE
 
     with _PARENT_STORE_PATH.open("r", encoding="utf-8") as f:
         raw: dict[str, Any] = json.load(f)
@@ -62,7 +78,8 @@ def _load_parent_store() -> dict[str, Document]:
         )
         for pid, entry in raw.items()
     }
-    logger.info("Loaded {} parent chunks from docstore", len(store))
+    logger.info("Loaded {} parent chunks from docstore (cached)", len(store))
+    _PARENT_STORE_CACHE = store
     return store
 
 
@@ -159,7 +176,7 @@ def get_retriever(
     top_k: int | None = None,
 ) -> BaseRetriever:
     """
-    Return the configured retriever.
+    Return the configured retriever (singleton cached).
 
     Args:
         use_parent: True → ParentAwareRetriever.
@@ -168,7 +185,17 @@ def get_retriever(
                             for parent-doc mode; rename env var as needed).
         top_k:      Number of context documents to return. Defaults to
                     settings.retriever_top_k.
+    
+    NOTE: Retriever is cached after first call. If you change use_parent or
+    top_k at runtime, those changes will be ignored (returns cached instance).
+    For testing, clear _RETRIEVER_CACHE global before calling.
     """
+    global _RETRIEVER_CACHE
+    
+    # Return cached retriever if already built
+    if _RETRIEVER_CACHE is not None:
+        return _RETRIEVER_CACHE
+    
     k = top_k or settings.retriever_top_k
     vector_store = get_langchain_vector_store()
 
@@ -177,12 +204,14 @@ def get_retriever(
 
     if parent_mode:
         parent_store = _load_parent_store()
-        logger.info("Using ParentAwareRetriever (top_k={})", k)
-        return ParentAwareRetriever(
+        logger.info("Building ParentAwareRetriever singleton (top_k={})", k)
+        _RETRIEVER_CACHE = ParentAwareRetriever(
             vector_store=vector_store,
             parent_store=parent_store,
             top_k=k,
         )
-
-    logger.info("Using StandardRetriever (top_k={})", k)
-    return StandardRetriever(vector_store=vector_store, top_k=k)
+    else:
+        logger.info("Building StandardRetriever singleton (top_k={})", k)
+        _RETRIEVER_CACHE = StandardRetriever(vector_store=vector_store, top_k=k)
+    
+    return _RETRIEVER_CACHE
