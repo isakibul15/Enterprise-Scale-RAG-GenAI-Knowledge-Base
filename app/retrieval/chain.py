@@ -170,9 +170,9 @@ def _build_rag_chain() -> RunnableWithMessageHistory:
 # Lazy singleton — built on first call
 _rag_chain: RunnableWithMessageHistory | None = None
 
-# Query result cache: (session_id, question_hash) → RAGResponse
+# Query result cache: (session_id, question_hash) → (RAGResponse, timestamp)
 # Prevents redundant LLM pipeline execution for identical questions
-_QUERY_CACHE: dict[tuple[str, int], RAGResponse] = {}
+_QUERY_CACHE: dict[tuple[str, int], tuple[RAGResponse, float]] = {}
 _QUERY_CACHE_MAX_SIZE = 500  # LRU limit for cached queries
 _QUERY_CACHE_TTL_SECONDS = 3600  # 1h TTL: cached results expire after 1h
 
@@ -195,8 +195,8 @@ def _evict_expired_queries() -> None:
     """Remove cached queries older than TTL."""
     current_time = time.time()
     expired = [
-        key for key, response in _QUERY_CACHE.items()
-        if current_time - response.latency_ms > _QUERY_CACHE_TTL_SECONDS * 1000
+        key for key, (_, timestamp) in _QUERY_CACHE.items()
+        if current_time - timestamp > _QUERY_CACHE_TTL_SECONDS
     ]
     for key in expired:
         _QUERY_CACHE.pop(key)
@@ -206,8 +206,8 @@ def _evict_expired_queries() -> None:
 def _evict_lru_query() -> None:
     """Remove least-recently-used cached query when max_size exceeded."""
     if len(_QUERY_CACHE) >= _QUERY_CACHE_MAX_SIZE:
-        # Simple LRU: remove first key (oldest insertion)
-        lru_key = next(iter(_QUERY_CACHE))
+        # Find LRU (oldest timestamp)
+        lru_key = min(_QUERY_CACHE.keys(), key=lambda k: _QUERY_CACHE[k][1])
         _QUERY_CACHE.pop(lru_key)
         logger.debug("Query cache: LRU evicted entry")
 
@@ -235,7 +235,7 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
     cache_key = _query_cache_key(question, session_id)
     _evict_expired_queries()
     if cache_key in _QUERY_CACHE:
-        cached_response = _QUERY_CACHE[cache_key]
+        cached_response, _ = _QUERY_CACHE[cache_key]
         cached_response.cache_hit = True
         logger.debug("Query cache HIT | session={} | question='{}'", session_id, question[:120])
         return cached_response
@@ -278,7 +278,7 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
 
     # Cache the result
     _evict_lru_query()
-    _QUERY_CACHE[cache_key] = response
+    _QUERY_CACHE[cache_key] = (response, time.time())
     logger.debug("Query cache MISS→STORE | session={}", session_id)
 
     return response
