@@ -40,10 +40,12 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from loguru import logger
+import numpy as np
 
 from app.retrieval.llm import get_llm
 from app.retrieval.prompts import CONDENSE_PROMPT, QA_PROMPT, format_retrieved_docs
 from app.retrieval.retriever import get_retriever
+from app.ingestion.embedder import get_embedding_model
 
 # ---------------------------------------------------------------------------
 # In-process session store with LRU cache + TTL (replace with Redis for multi-pod)
@@ -170,11 +172,12 @@ def _build_rag_chain() -> RunnableWithMessageHistory:
 # Lazy singleton — built on first call
 _rag_chain: RunnableWithMessageHistory | None = None
 
-# Query result cache: (session_id, question_hash) → (RAGResponse, timestamp)
-# Prevents redundant LLM pipeline execution for identical questions
-_QUERY_CACHE: dict[tuple[str, int], tuple[RAGResponse, float]] = {}
+# Query result cache: (session_id, question_hash) → (RAGResponse, timestamp, embedding)
+# Prevents redundant LLM pipeline execution for identical AND semantically similar questions
+_QUERY_CACHE: dict[tuple[str, int], tuple[RAGResponse, float, list]] = {}
 _QUERY_CACHE_MAX_SIZE = 500  # LRU limit for cached queries
 _QUERY_CACHE_TTL_SECONDS = 3600  # 1h TTL: cached results expire after 1h
+_SEMANTIC_SIMILARITY_THRESHOLD = 0.85  # Min cosine similarity (0.0-1.0) to reuse cached answer
 
 
 def _get_rag_chain() -> RunnableWithMessageHistory:
@@ -195,7 +198,7 @@ def _evict_expired_queries() -> None:
     """Remove cached queries older than TTL."""
     current_time = time.time()
     expired = [
-        key for key, (_, timestamp) in _QUERY_CACHE.items()
+        key for key, (_, timestamp, _) in _QUERY_CACHE.items()
         if current_time - timestamp > _QUERY_CACHE_TTL_SECONDS
     ]
     for key in expired:
@@ -210,6 +213,46 @@ def _evict_lru_query() -> None:
         lru_key = min(_QUERY_CACHE.keys(), key=lambda k: _QUERY_CACHE[k][1])
         _QUERY_CACHE.pop(lru_key)
         logger.debug("Query cache: LRU evicted entry")
+
+
+def _find_semantically_similar_cached_answer(
+    question: str,
+    session_id: str,
+) -> RAGResponse | None:
+    """
+    Search cache for semantically similar questions (cosine similarity > threshold).
+    
+    Uses dot product for cosine similarity since embeddings are already normalized
+    (set via normalize_embeddings=True in embedder config).
+    
+    Returns cached RAGResponse if found, else None.
+    """
+    try:
+        # Get embedding for incoming question
+        embedder = get_embedding_model()
+        question_embedding = np.array(embedder.embed_query(question.strip().lower()))
+        
+        # Search for similar cached entries in same session
+        for (cache_session, _), (response, _, cached_embedding) in _QUERY_CACHE.items():
+            if cache_session != session_id or not cached_embedding:
+                continue
+            
+            # Compute cosine similarity via dot product (embeddings are normalized)
+            cached_vec = np.array(cached_embedding)
+            similarity = float(np.dot(question_embedding, cached_vec))
+            
+            if similarity >= _SEMANTIC_SIMILARITY_THRESHOLD:
+                logger.debug(
+                    "Query cache SEMANTIC HIT | session={} | similarity={:.3f}",
+                    session_id,
+                    similarity,
+                )
+                return response
+    except Exception as e:
+        logger.warning("Semantic similarity lookup failed (falling through): {}", e)
+        # Fall through to full pipeline on error
+    
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -231,14 +274,21 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
     if not question.strip():
         return RAGResponse(answer="Please provide a non-empty question.", session_id=session_id)
 
-    # Check query result cache first
+    # Check query result cache (exact match first, then semantic)
     cache_key = _query_cache_key(question, session_id)
     _evict_expired_queries()
+    
     if cache_key in _QUERY_CACHE:
-        cached_response, _ = _QUERY_CACHE[cache_key]
+        cached_response, _, _ = _QUERY_CACHE[cache_key]
         cached_response.cache_hit = True
-        logger.debug("Query cache HIT | session={} | question='{}'", session_id, question[:120])
+        logger.debug("Query cache EXACT HIT | session={} | question='{}'", session_id, question[:120])
         return cached_response
+    
+    # Try semantic similarity lookup
+    semantic_match = _find_semantically_similar_cached_answer(question, session_id)
+    if semantic_match is not None:
+        semantic_match.cache_hit = True
+        return semantic_match
 
     chain = _get_rag_chain()
     t0 = time.perf_counter()
@@ -276,10 +326,17 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
         retrieved_chunks=len(context_docs),
     )
 
-    # Cache the result
+    # Cache the result with embedding for semantic similarity
     _evict_lru_query()
-    _QUERY_CACHE[cache_key] = (response, time.time())
-    logger.debug("Query cache MISS→STORE | session={}", session_id)
+    try:
+        embedder = get_embedding_model()
+        question_embedding = embedder.embed_query(question.strip().lower())
+        _QUERY_CACHE[cache_key] = (response, time.time(), question_embedding)
+        logger.debug("Query cache MISS→STORE | session={} | embedding cached", session_id)
+    except Exception as e:
+        logger.warning("Failed to cache embedding for query: {}", e)
+        # Still cache response even if embedding failed
+        _QUERY_CACHE[cache_key] = (response, time.time(), [])
 
     return response
 
