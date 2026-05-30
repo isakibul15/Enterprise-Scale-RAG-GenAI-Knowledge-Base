@@ -113,6 +113,80 @@ export async function exportChatAsHtml(messages, sessionId) {
   downloadBlob(blob, `chat-${sessionId}-${Date.now()}.html`);
 }
 
+export async function exportChatAsPdf(messages, sessionId) {
+  try {
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const maxWidth = pageWidth - 2 * margin;
+    let y = margin;
+
+    // Header
+    pdf.setFillColor(124, 58, 237);
+    pdf.rect(margin, y, maxWidth, 25, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(16);
+    pdf.text('Chat Export', margin + 5, y + 10);
+
+    pdf.setFontSize(9);
+    y += 7;
+    pdf.text(`Session: ${sessionId}`, margin + 5, y + 10);
+    pdf.text(`Exported: ${new Date().toLocaleString()}`, margin + 5, y + 15);
+    pdf.text(`Messages: ${messages.length}`, margin + 5, y + 20);
+
+    y += 30;
+    pdf.setTextColor(0, 0, 0);
+
+    // Messages
+    for (const msg of messages) {
+      const isUser = msg.role === 'user';
+
+      // Check if we need a new page
+      if (y > pageHeight - margin - 10) {
+        pdf.addPage();
+        y = margin;
+      }
+
+      // Message role
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(isUser ? 124 : 79, isUser ? 58 : 46, 237);
+      pdf.text(`${msg.role.toUpperCase()}:`, margin, y);
+
+      y += 6;
+
+      // Message content (wrapped)
+      pdf.setFontSize(9);
+      pdf.setFont(undefined, 'normal');
+      pdf.setTextColor(0, 0, 0);
+
+      const wrappedText = pdf.splitTextToSize(msg.content, maxWidth - 4);
+      for (const line of wrappedText) {
+        if (y > pageHeight - margin - 10) {
+          pdf.addPage();
+          y = margin;
+        }
+        pdf.text(line, margin + 2, y);
+        y += 5;
+      }
+
+      y += 3;
+    }
+
+    pdf.save(`chat-${sessionId}-${Date.now()}.pdf`);
+  } catch (err) {
+    // Fallback if jsPDF not available
+    throw new Error(`PDF export failed: ${err.message}`);
+  }
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
