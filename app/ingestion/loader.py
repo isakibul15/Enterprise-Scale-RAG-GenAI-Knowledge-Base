@@ -7,6 +7,8 @@ Each loaded Document carries rich metadata for downstream filtering.
 """
 
 import hashlib
+import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -36,6 +38,102 @@ _LOADER_MAP: dict[str, type] = {
 }
 
 _TEXT_EXTENSIONS = {".txt", ".md", ".markdown"}
+
+# File hash cache database
+_HASH_CACHE_DB_PATH = Path("data/processed/.file_hash_cache.db")
+_HASH_CACHE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# In-memory cache for hash lookups (reduces DB hits)
+_HASH_MEMORY_CACHE: dict[str, tuple[str, float]] = {}  # filepath -> (hash, mtime)
+
+
+def _init_hash_cache_db() -> None:
+    """Initialize SQLite database for file hash caching."""
+    try:
+        conn = sqlite3.connect(str(_HASH_CACHE_DB_PATH))
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS file_hashes (
+                file_path TEXT PRIMARY KEY,
+                file_hash TEXT NOT NULL,
+                file_mtime REAL NOT NULL,
+                cached_at REAL NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON file_hashes(file_path)")
+        conn.commit()
+        conn.close()
+        logger.debug(f"File hash cache database initialized at {_HASH_CACHE_DB_PATH}")
+    except Exception as e:
+        logger.warning(f"Failed to initialize file hash cache DB: {e}")
+
+
+def _get_cached_hash(file_path: Path) -> str | None:
+    """
+    Retrieve cached hash if file hasn't been modified.
+    
+    Returns None if:
+    - File not in cache
+    - File has been modified since cache entry
+    - Cache lookup fails
+    """
+    file_path_str = str(file_path.resolve())
+    
+    # Check memory cache first
+    if file_path_str in _HASH_MEMORY_CACHE:
+        cached_hash, cached_mtime = _HASH_MEMORY_CACHE[file_path_str]
+        current_mtime = file_path.stat().st_mtime
+        if current_mtime == cached_mtime:
+            return cached_hash
+        else:
+            # File was modified, invalidate memory cache entry
+            del _HASH_MEMORY_CACHE[file_path_str]
+    
+    # Check SQLite cache
+    try:
+        conn = sqlite3.connect(str(_HASH_CACHE_DB_PATH))
+        cursor = conn.cursor()
+        current_mtime = file_path.stat().st_mtime
+        cursor.execute(
+            "SELECT file_hash FROM file_hashes WHERE file_path = ? AND file_mtime = ?",
+            (file_path_str, current_mtime)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            cached_hash = row[0]
+            # Update memory cache
+            _HASH_MEMORY_CACHE[file_path_str] = (cached_hash, current_mtime)
+            return cached_hash
+    except Exception as e:
+        logger.warning(f"Failed to query hash cache: {e}")
+    
+    return None
+
+
+def _cache_hash(file_path: Path, file_hash: str) -> None:
+    """Store computed hash in cache."""
+    file_path_str = str(file_path.resolve())
+    current_mtime = file_path.stat().st_mtime
+    
+    # Update memory cache
+    _HASH_MEMORY_CACHE[file_path_str] = (file_hash, current_mtime)
+    
+    # Update SQLite cache
+    try:
+        conn = sqlite3.connect(str(_HASH_CACHE_DB_PATH))
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT OR REPLACE INTO file_hashes 
+               (file_path, file_hash, file_mtime, cached_at) 
+               VALUES (?, ?, ?, ?)""",
+            (file_path_str, file_hash, current_mtime, time.time())
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to cache hash in DB: {e}")
 
 
 def _build_loader(file_path: Path):
@@ -89,9 +187,19 @@ def load_file(file_path: Path) -> list[Document]:
     if file_path.stat().st_size == 0:
         raise ValueError(f"File is empty: {file_path}")
 
-    logger.info("Loading file: {}", file_path.name)
+    logger.info(f"Loading file: {file_path.name}")
 
-    file_hash = _sha256(file_path)
+    # Try to get hash from cache first
+    cached_hash = _get_cached_hash(file_path)
+    if cached_hash:
+        file_hash = cached_hash
+        logger.debug(f"Using cached hash for {file_path.name}")
+    else:
+        # Compute hash and cache it
+        file_hash = _sha256(file_path)
+        _cache_hash(file_path, file_hash)
+        logger.debug(f"Computed and cached hash for {file_path.name}")
+
     loader = _build_loader(file_path)
 
     try:
