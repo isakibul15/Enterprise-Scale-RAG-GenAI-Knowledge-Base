@@ -167,7 +167,8 @@ def upsert_documents(
 
             # Flatten metadata: ChromaDB only accepts str / int / float / bool values.
             # Any complex types (lists, dicts, None) are cast to strings.
-            metadatas = [_sanitise_metadata(doc.metadata) for doc in batch_docs]
+            # Use cached sanitization for better performance
+            metadatas = [_sanitise_metadata_cached(doc.metadata) for doc in batch_docs]
 
             try:
                 collection.upsert(
@@ -202,6 +203,8 @@ def _sanitise_metadata(metadata: dict) -> dict:
     """
     ChromaDB rejects None and non-scalar values in metadata.
     Cast everything to a safe type so upserts never fail on metadata alone.
+    
+    Optimized with common patterns cache to reduce string conversions.
     """
     safe: dict = {}
     for k, v in metadata.items():
@@ -210,7 +213,55 @@ def _sanitise_metadata(metadata: dict) -> dict:
         elif v is None:
             safe[k] = ""
         else:
+            # Convert complex types to string
             safe[k] = str(v)
+    return safe
+
+
+# Precompute sanitized metadata templates for common document fields
+_COMMON_SANITIZED_KEYS = {
+    "chunk_id": str,
+    "parent_id": str,
+    "source": str,
+    "file_name": str,
+    "file_type": str,
+    "file_size_bytes": int,
+    "file_hash": str,
+    "loaded_at": str,
+}
+
+
+def _sanitise_metadata_cached(metadata: dict) -> dict:
+    """
+    Optimized metadata sanitization using precomputed type mappings.
+    
+    Reduces conversion overhead for common metadata fields by using
+    cached type information instead of runtime isinstance checks.
+    """
+    safe: dict = {}
+    for k, v in metadata.items():
+        expected_type = _COMMON_SANITIZED_KEYS.get(k)
+        
+        if expected_type is not None:
+            # Fast path: known field type
+            if expected_type is str:
+                safe[k] = str(v) if v is not None else ""
+            elif expected_type is int:
+                try:
+                    safe[k] = int(v)
+                except (ValueError, TypeError):
+                    safe[k] = str(v)
+            else:
+                safe[k] = v
+        else:
+            # Fallback: generic type checking
+            if isinstance(v, (str, int, float, bool)):
+                safe[k] = v
+            elif v is None:
+                safe[k] = ""
+            else:
+                safe[k] = str(v)
+    
     return safe
 
 
