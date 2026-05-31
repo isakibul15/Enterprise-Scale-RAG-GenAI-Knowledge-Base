@@ -31,6 +31,8 @@ The public interface:
 from __future__ import annotations
 
 import time
+import threading
+import sys
 from dataclasses import dataclass, field
 from typing import AsyncIterator
 
@@ -48,7 +50,7 @@ from app.retrieval.retriever import get_retriever
 from app.ingestion.embedder import get_embedding_model
 
 # ---------------------------------------------------------------------------
-# In-process session store with LRU cache + TTL (replace with Redis for multi-pod)
+# Thread-safe session store with LRU cache + TTL + memory monitoring
 # ---------------------------------------------------------------------------
 
 # LRU session store with automatic eviction when max_size exceeded
@@ -56,6 +58,20 @@ from app.ingestion.embedder import get_embedding_model
 _SESSION_STORE: dict[str, tuple[ChatMessageHistory, float]] = {}
 _MAX_SESSIONS = 1000  # LRU limit: max concurrent sessions in memory
 _SESSION_TTL_SECONDS = 86400  # 24h TTL: sessions auto-evict after 24h of last access
+_SESSION_LOCK = threading.RLock()  # Thread-safe access to session store
+_MEMORY_CHECK_INTERVAL = 100  # Check memory stats every N operations
+_OPERATION_COUNT = 0
+
+
+def _get_session_memory_usage() -> float:
+    """Estimate memory usage of session store in MB."""
+    size_bytes = sys.getsizeof(_SESSION_STORE)
+    for session_id, (history, _) in _SESSION_STORE.items():
+        size_bytes += sys.getsizeof(session_id)
+        size_bytes += sys.getsizeof(history)
+        for msg in history.messages:
+            size_bytes += sys.getsizeof(msg)
+    return size_bytes / (1024 * 1024)
 
 
 def _evict_expired_sessions() -> None:
@@ -65,9 +81,12 @@ def _evict_expired_sessions() -> None:
         sid for sid, (_, timestamp) in _SESSION_STORE.items()
         if current_time - timestamp > _SESSION_TTL_SECONDS
     ]
-    for sid in expired:
-        _SESSION_STORE.pop(sid)
-        logger.debug("Auto-evicted expired session: {}", sid)
+    if expired:
+        memory_before = _get_session_memory_usage()
+        for sid in expired:
+            _SESSION_STORE.pop(sid)
+        memory_after = _get_session_memory_usage()
+        logger.debug(f"Auto-evicted {len(expired)} expired sessions. Memory freed: {memory_before - memory_after:.2f}MB")
 
 
 def _evict_lru_session() -> None:
@@ -76,33 +95,45 @@ def _evict_lru_session() -> None:
         # Find LRU (oldest timestamp)
         lru_sid = min(_SESSION_STORE.keys(), key=lambda s: _SESSION_STORE[s][1])
         _SESSION_STORE.pop(lru_sid)
-        logger.debug("LRU evicted session: {}", lru_sid)
+        logger.debug(f"LRU evicted session: {lru_sid}")
 
 
 def _get_session_history(session_id: str) -> BaseChatMessageHistory:
-    _evict_expired_sessions()
-    _evict_lru_session()
+    global _OPERATION_COUNT
     
-    if session_id not in _SESSION_STORE:
-        _SESSION_STORE[session_id] = (ChatMessageHistory(), time.time())
-        logger.debug("New chat session: {}", session_id)
-    else:
-        # Update access timestamp for LRU tracking
-        history, _ = _SESSION_STORE[session_id]
-        _SESSION_STORE[session_id] = (history, time.time())
-    
-    return _SESSION_STORE[session_id][0]
+    with _SESSION_LOCK:
+        _OPERATION_COUNT += 1
+        
+        # Periodic memory check and logging
+        if _OPERATION_COUNT % _MEMORY_CHECK_INTERVAL == 0:
+            mem_usage = _get_session_memory_usage()
+            logger.debug(f"Session store: {len(_SESSION_STORE)} sessions, {mem_usage:.2f}MB memory")
+        
+        _evict_expired_sessions()
+        _evict_lru_session()
+        
+        if session_id not in _SESSION_STORE:
+            _SESSION_STORE[session_id] = (ChatMessageHistory(), time.time())
+            logger.debug(f"New chat session: {session_id}")
+        else:
+            # Update access timestamp for LRU tracking
+            history, _ = _SESSION_STORE[session_id]
+            _SESSION_STORE[session_id] = (history, time.time())
+        
+        return _SESSION_STORE[session_id][0]
 
 
 def clear_session(session_id: str) -> None:
     """Delete the message history for *session_id*."""
-    _SESSION_STORE.pop(session_id, None)
-    logger.info("Cleared session: {}", session_id)
+    with _SESSION_LOCK:
+        _SESSION_STORE.pop(session_id, None)
+        logger.info(f"Cleared session: {session_id}")
 
 
 def list_sessions() -> list[str]:
-    _evict_expired_sessions()
-    return list(_SESSION_STORE.keys())
+    with _SESSION_LOCK:
+        _evict_expired_sessions()
+        return list(_SESSION_STORE.keys())
 
 
 # ---------------------------------------------------------------------------
