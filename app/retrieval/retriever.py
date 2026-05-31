@@ -96,10 +96,11 @@ def _load_parent_store() -> dict[str, Document]:
 # ---------------------------------------------------------------------------
 
 class StandardRetriever(BaseRetriever):
-    """Wraps a LangChain VectorStore retriever with structured logging."""
+    """Wraps a LangChain VectorStore retriever with structured logging and optional metadata filtering."""
 
     vector_store: VectorStore
     top_k: int = Field(default=6)
+    filter_metadata: dict | None = Field(default=None)  # Optional metadata filters
 
     class Config:
         arbitrary_types_allowed = True
@@ -110,8 +111,17 @@ class StandardRetriever(BaseRetriever):
         *,
         run_manager: CallbackManagerForRetrieverRun,
     ) -> list[Document]:
-        docs = self.vector_store.similarity_search(query, k=self.top_k)
-        logger.debug("Standard retriever: {} doc(s) for query '{}'", len(docs), query[:80])
+        # Apply metadata filter if provided
+        if self.filter_metadata:
+            docs = self.vector_store.similarity_search(
+                query, 
+                k=self.top_k,
+                filter=self.filter_metadata
+            )
+            logger.debug(f"Standard retriever: {len(docs)} doc(s) for query '{query[:80]}' (filtered: {self.filter_metadata})")
+        else:
+            docs = self.vector_store.similarity_search(query, k=self.top_k)
+            logger.debug(f"Standard retriever: {len(docs)} doc(s) for query '{query[:80]}'")
         return docs
 
 
@@ -128,11 +138,14 @@ class ParentAwareRetriever(BaseRetriever):
     Falls back to the child chunk when the parent is not found in the store.
     Deduplicates by parent_id so one parent is returned at most once even
     when multiple of its children are top hits.
+    
+    Supports optional metadata filtering to narrow search scope (e.g., by file_type, source).
     """
 
     vector_store: VectorStore
     parent_store: dict = Field(default_factory=dict)
     top_k: int = Field(default=6)
+    filter_metadata: dict | None = Field(default=None)  # Optional metadata filters
 
     class Config:
         arbitrary_types_allowed = True
@@ -144,7 +157,16 @@ class ParentAwareRetriever(BaseRetriever):
         run_manager: CallbackManagerForRetrieverRun,
     ) -> list[Document]:
         # Fetch more child chunks than needed — some may share a parent
-        child_hits = self.vector_store.similarity_search(query, k=self.top_k * 2)
+        # Apply metadata filter if provided
+        if self.filter_metadata:
+            logger.debug(f"Applying metadata filter: {self.filter_metadata}")
+            child_hits = self.vector_store.similarity_search(
+                query, 
+                k=self.top_k * 2,
+                filter=self.filter_metadata
+            )
+        else:
+            child_hits = self.vector_store.similarity_search(query, k=self.top_k * 2)
 
         seen_parents: set[str] = set()
         result: list[Document] = []
@@ -166,11 +188,9 @@ class ParentAwareRetriever(BaseRetriever):
             if len(result) >= self.top_k:
                 break
 
+        filter_desc = f" (filtered: {self.filter_metadata})" if self.filter_metadata else ""
         logger.debug(
-            "ParentAwareRetriever: {} child hits → {} unique context doc(s) for '{}'",
-            len(child_hits),
-            len(result),
-            query[:80],
+            f"ParentAwareRetriever: {len(child_hits)} child hits → {len(result)} unique context doc(s) for '{query[:80]}'{filter_desc}"
         )
         return result
 
@@ -243,3 +263,34 @@ def get_retriever_stats() -> dict[str, Any]:
         "config": _RETRIEVER_CONFIG,
         "parent_store_size": len(_PARENT_STORE_CACHE) if _PARENT_STORE_CACHE else 0,
     }
+
+
+def create_metadata_filter(
+    file_type: str | None = None,
+    source: str | None = None,
+    file_hash: str | None = None,
+) -> dict | None:
+    """
+    Create a metadata filter dict for retriever queries.
+    
+    Args:
+        file_type: Filter by file type (e.g., 'pdf', 'txt')
+        source: Filter by source file path
+        file_hash: Filter by file hash
+    
+    Returns:
+        Metadata filter dict compatible with ChromaDB where clause, or None if no filters
+        
+    Example:
+        filter = create_metadata_filter(file_type="pdf", source="/path/to/doc.pdf")
+        retriever = get_retriever(filter_metadata=filter)
+    """
+    filters = {}
+    if file_type:
+        filters["file_type"] = file_type
+    if source:
+        filters["source"] = source
+    if file_hash:
+        filters["file_hash"] = file_hash
+    
+    return filters if filters else None
