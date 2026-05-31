@@ -412,20 +412,42 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
 async def stream_ask(
     question: str,
     session_id: str = "default",
+    buffer_size: int = 3,  # Buffer tokens for efficient streaming
 ) -> AsyncIterator[str]:
     """
-    Stream the answer token-by-token.
+    Stream the answer token-by-token with optimized buffering.
 
     Yields raw string tokens; the caller (FastAPI endpoint) wraps them in
     Server-Sent Events or WebSocket messages.
+    
+    Args:
+        question: The user's natural-language question.
+        session_id: Identifies the conversation thread.
+        buffer_size: Number of tokens to buffer before yielding (1=no buffering, higher=more efficient but higher latency)
     """
     if not question.strip():
         yield "Please provide a non-empty question."
         return
 
-    chain = _get_rag_chain()
-    logger.info("RAG stream | session={} | question='{}'", session_id, question[:120])
+    # Check cache first for streaming optimization
+    cache_key = _query_cache_key(question, session_id)
+    if cache_key in _QUERY_CACHE:
+        cached_response, _, _ = _QUERY_CACHE[cache_key]
+        logger.info(f"RAG stream | cache HIT | session={session_id} | question='{question[:120]}'")
+        # Stream cached answer in buffered chunks
+        answer = cached_response.answer
+        for i in range(0, len(answer), max(1, len(answer) // 10)):
+            yield answer[i:i + max(1, len(answer) // 10)]
+        return
 
+    _CACHE_STATS["misses"] += 1
+    chain = _get_rag_chain()
+    t0 = time.perf_counter()
+    logger.info(f"RAG stream | session={session_id} | question='{question[:120]}'")
+
+    token_buffer: list[str] = []
+    total_tokens = 0
+    
     try:
         async for chunk in chain.astream(
             {"input": question},
@@ -434,9 +456,25 @@ async def stream_ask(
             # astream yields dicts; the answer token lives under "answer"
             token = chunk.get("answer", "")
             if token:
-                yield token
+                token_buffer.append(token)
+                total_tokens += len(token)
+                
+                # Flush buffer when it reaches target size or contains many characters
+                if len(token_buffer) >= buffer_size or total_tokens > 100:
+                    buffered_text = "".join(token_buffer)
+                    yield buffered_text
+                    token_buffer = []
+                    total_tokens = 0
+        
+        # Flush remaining tokens
+        if token_buffer:
+            yield "".join(token_buffer)
+        
+        streaming_latency = (time.perf_counter() - t0) * 1000
+        logger.info(f"RAG stream complete | session={session_id} | latency={streaming_latency:.0f}ms")
+        
     except Exception as exc:
-        logger.exception("RAG stream error for session {}: {}", session_id, exc)
+        logger.exception(f"RAG stream error for session {session_id}: {exc}")
         yield f"\n\n[Error: {exc}]"
 
 
