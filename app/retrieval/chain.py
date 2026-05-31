@@ -210,6 +210,14 @@ _QUERY_CACHE_MAX_SIZE = 500  # LRU limit for cached queries
 _QUERY_CACHE_TTL_SECONDS = 3600  # 1h TTL: cached results expire after 1h
 _SEMANTIC_SIMILARITY_THRESHOLD = 0.85  # Min cosine similarity (0.0-1.0) to reuse cached answer
 
+# Cache statistics tracking
+_CACHE_STATS = {
+    "total_queries": 0,
+    "exact_hits": 0,
+    "semantic_hits": 0,
+    "misses": 0,
+}
+
 
 def _get_rag_chain() -> RunnableWithMessageHistory:
     global _rag_chain
@@ -274,16 +282,45 @@ def _find_semantically_similar_cached_answer(
             
             if similarity >= _SEMANTIC_SIMILARITY_THRESHOLD:
                 logger.debug(
-                    "Query cache SEMANTIC HIT | session={} | similarity={:.3f}",
-                    session_id,
-                    similarity,
+                    f"Query cache SEMANTIC HIT | session={session_id} | similarity={similarity:.3f}"
                 )
+                _CACHE_STATS["semantic_hits"] += 1
                 return response
     except Exception as e:
-        logger.warning("Semantic similarity lookup failed (falling through): {}", e)
+        logger.warning(f"Semantic similarity lookup failed (falling through): {e}")
         # Fall through to full pipeline on error
     
     return None
+
+
+def get_query_cache_stats() -> dict:
+    """Return query cache statistics for monitoring."""
+    total = _CACHE_STATS["total_queries"]
+    exact = _CACHE_STATS["exact_hits"]
+    semantic = _CACHE_STATS["semantic_hits"]
+    hits = exact + semantic
+    hit_rate = (hits / total * 100) if total > 0 else 0
+    
+    return {
+        "total_queries": total,
+        "exact_hits": exact,
+        "semantic_hits": semantic,
+        "total_hits": hits,
+        "misses": _CACHE_STATS["misses"],
+        "hit_rate_percent": round(hit_rate, 2),
+        "cache_size": len(_QUERY_CACHE),
+        "max_size": _QUERY_CACHE_MAX_SIZE,
+    }
+
+
+def clear_query_cache() -> int:
+    """Clear all cached queries. Returns count of cleared entries."""
+    global _QUERY_CACHE, _CACHE_STATS
+    cleared = len(_QUERY_CACHE)
+    _QUERY_CACHE.clear()
+    _CACHE_STATS = {"total_queries": 0, "exact_hits": 0, "semantic_hits": 0, "misses": 0}
+    logger.info(f"Query cache cleared ({cleared} entries)")
+    return cleared
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +339,8 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
     Returns:
         RAGResponse with answer, sources, and latency.
     """
+    _CACHE_STATS["total_queries"] += 1
+    
     if not question.strip():
         return RAGResponse(answer="Please provide a non-empty question.", session_id=session_id)
 
@@ -312,7 +351,8 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
     if cache_key in _QUERY_CACHE:
         cached_response, _, _ = _QUERY_CACHE[cache_key]
         cached_response.cache_hit = True
-        logger.debug("Query cache EXACT HIT | session={} | question='{}'", session_id, question[:120])
+        _CACHE_STATS["exact_hits"] += 1
+        logger.debug(f"Query cache EXACT HIT | session={session_id} | question='{question[:120]}'")
         return cached_response
     
     # Try semantic similarity lookup
@@ -321,10 +361,11 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
         semantic_match.cache_hit = True
         return semantic_match
 
+    _CACHE_STATS["misses"] += 1
     chain = _get_rag_chain()
     t0 = time.perf_counter()
 
-    logger.info("RAG query | session={} | question='{}'", session_id, question[:120])
+    logger.info(f"RAG query | session={session_id} | question='{question[:120]}'")
 
     try:
         result: dict = chain.invoke(
@@ -332,7 +373,7 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
             config={"configurable": {"session_id": session_id}},
         )
     except Exception as exc:
-        logger.exception("RAG chain error for session {}: {}", session_id, exc)
+        logger.exception(f"RAG chain error for session {session_id}: {exc}")
         raise
 
     latency_ms = (time.perf_counter() - t0) * 1000
@@ -342,11 +383,7 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
     sources = _extract_sources(context_docs)
 
     logger.info(
-        "RAG answer | session={} | chunks={} | latency={:.0f}ms | answer_len={}",
-        session_id,
-        len(context_docs),
-        latency_ms,
-        len(answer),
+        f"RAG answer | session={session_id} | chunks={len(context_docs)} | latency={latency_ms:.0f}ms | answer_len={len(answer)}"
     )
 
     response = RAGResponse(
@@ -363,9 +400,9 @@ def ask(question: str, session_id: str = "default") -> RAGResponse:
         embedder = get_embedding_model()
         question_embedding = embedder.embed_query(question.strip().lower())
         _QUERY_CACHE[cache_key] = (response, time.time(), question_embedding)
-        logger.debug("Query cache MISS→STORE | session={} | embedding cached", session_id)
+        logger.debug(f"Query cache MISS→STORE | session={session_id} | embedding cached")
     except Exception as e:
-        logger.warning("Failed to cache embedding for query: {}", e)
+        logger.warning(f"Failed to cache embedding for query: {e}")
         # Still cache response even if embedding failed
         _QUERY_CACHE[cache_key] = (response, time.time(), [])
 
