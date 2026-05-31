@@ -9,10 +9,13 @@ ParentDocumentRetriever in Milestone 3 can reconstruct full context.
 
 The pipeline is intentionally synchronous so it can be run from a
 CLI script or handed off to a background worker (Celery, ARQ, etc.).
+
+Supports parallel batch processing with ThreadPoolExecutor for multi-file ingestion.
 """
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -34,6 +37,10 @@ _PARENT_STORE_PATH = Path("data/processed/parent_store.json")
 
 # JSON file tracking file hashes to skip re-embedding unchanged files
 _FILE_HASH_REGISTRY_PATH = Path("data/processed/file_hash_registry.json")
+
+# Parallel processing configuration
+_MAX_WORKERS = 4  # Number of parallel threads for file ingestion
+_PARALLEL_ENABLED = True  # Enable/disable parallel processing
 
 
 # ---------------------------------------------------------------------------
@@ -207,23 +214,66 @@ class IngestionPipeline:
         dir_path: Path,
         recursive: bool = True,
     ) -> IngestionResult:
-        """Ingest every supported file under *dir_path*."""
+        """Ingest every supported file under *dir_path* with optional parallelization."""
         result = IngestionResult()
         t0 = time.perf_counter()
 
         file_iter = list(load_directory(dir_path, recursive=recursive))
         result.total_files = len(file_iter)
 
-        for file_path, docs in tqdm(file_iter, desc="Ingesting files", unit="file"):
-            try:
-                self._process_docs(file_path, docs, result)
-            except Exception as exc:
-                logger.error("Failed to ingest '{}': {}", file_path.name, exc)
-                result.failed_files.append(str(file_path))
+        if _PARALLEL_ENABLED and len(file_iter) > 1:
+            # Use ThreadPoolExecutor for parallel ingestion
+            logger.info(f"Starting parallel ingestion with {_MAX_WORKERS} workers")
+            self._ingest_directory_parallel(file_iter, result)
+        else:
+            # Sequential ingestion for small batches or disabled parallelization
+            for file_path, docs in tqdm(file_iter, desc="Ingesting files", unit="file"):
+                try:
+                    self._process_docs(file_path, docs, result)
+                except Exception as exc:
+                    logger.error(f"Failed to ingest '{file_path.name}': {exc}")
+                    result.failed_files.append(str(file_path))
 
         result.duration_seconds = time.perf_counter() - t0
         result.log_summary()
         return result
+
+    def _ingest_directory_parallel(self, file_iter, result: IngestionResult) -> None:
+        """Process multiple files in parallel using ThreadPoolExecutor."""
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+            # Submit all tasks
+            futures = {}
+            for file_path, docs in file_iter:
+                future = executor.submit(self._process_docs_safe, file_path, docs, result)
+                futures[future] = str(file_path)
+            
+            # Process completed tasks with progress bar
+            with tqdm(total=len(futures), desc="Ingesting files (parallel)", unit="file") as pbar:
+                for future in as_completed(futures):
+                    file_path_str = futures[future]
+                    try:
+                        future.result()
+                        logger.debug(f"Completed parallel ingestion: {file_path_str}")
+                    except Exception as exc:
+                        logger.error(f"Failed to ingest '{file_path_str}' (parallel): {exc}")
+                        result.failed_files.append(file_path_str)
+                    finally:
+                        pbar.update(1)
+
+    def _process_docs_safe(self, file_path: Path, docs, result: IngestionResult) -> None:
+        """Thread-safe wrapper for _process_docs with proper result accumulation."""
+        try:
+            source = str(file_path.resolve())
+            file_hash = docs[0].metadata.get("file_hash", "")
+            if is_file_already_ingested(source, file_hash):
+                logger.info(f"File '{file_path.name}' already ingested (hash match) — skipping")
+                result.successful_files.append(source)
+                return
+            
+            self._process_docs(file_path, docs, result)
+        except Exception as exc:
+            logger.error(f"Error in parallel processing: {exc}")
+            raise
 
     # ------------------------------------------------------------------
     # Internal helpers
