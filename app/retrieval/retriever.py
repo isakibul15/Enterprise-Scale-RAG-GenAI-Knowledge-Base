@@ -18,6 +18,7 @@ never needs to know which mode is active.
 """
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -35,9 +36,12 @@ _PARENT_STORE_PATH = Path("data/processed/parent_store.json")
 
 # Cached parent store (loaded once, reused across requests)
 _PARENT_STORE_CACHE: dict[str, Document] | None = None
+_PARENT_STORE_BUILD_TIME: float = 0.0
 
 # Cached retriever singleton (built once, reused across requests)
 _RETRIEVER_CACHE: BaseRetriever | None = None
+_RETRIEVER_BUILD_TIME: float = 0.0
+_RETRIEVER_CONFIG: dict[str, Any] | None = None  # Track which config was used
 
 
 # ---------------------------------------------------------------------------
@@ -54,16 +58,17 @@ def _load_parent_store() -> dict[str, Document]:
     Returns an empty dict (gracefully) if the store does not exist yet —
     the retriever will then fall back to child chunks.
     """
-    global _PARENT_STORE_CACHE
+    global _PARENT_STORE_CACHE, _PARENT_STORE_BUILD_TIME
     
     # Return cached store if already loaded
     if _PARENT_STORE_CACHE is not None:
         return _PARENT_STORE_CACHE
     
+    load_start = time.perf_counter()
+    
     if not _PARENT_STORE_PATH.exists():
         logger.warning(
-            "Parent store not found at '{}' — falling back to child chunks",
-            _PARENT_STORE_PATH,
+            f"Parent store not found at '{_PARENT_STORE_PATH}' — falling back to child chunks"
         )
         _PARENT_STORE_CACHE = {}
         return _PARENT_STORE_CACHE
@@ -78,7 +83,10 @@ def _load_parent_store() -> dict[str, Document]:
         )
         for pid, entry in raw.items()
     }
-    logger.info("Loaded {} parent chunks from docstore (cached)", len(store))
+    
+    load_time_ms = (time.perf_counter() - load_start) * 1000
+    _PARENT_STORE_BUILD_TIME = load_time_ms
+    logger.info(f"Loaded {len(store)} parent chunks from docstore in {load_time_ms:.2f}ms (cached)")
     _PARENT_STORE_CACHE = store
     return store
 
@@ -190,28 +198,48 @@ def get_retriever(
     top_k at runtime, those changes will be ignored (returns cached instance).
     For testing, clear _RETRIEVER_CACHE global before calling.
     """
-    global _RETRIEVER_CACHE
+    global _RETRIEVER_CACHE, _RETRIEVER_BUILD_TIME, _RETRIEVER_CONFIG
     
     # Return cached retriever if already built
     if _RETRIEVER_CACHE is not None:
+        logger.debug(f"Retriever cache hit (built {_RETRIEVER_BUILD_TIME:.2f}ms ago)")
         return _RETRIEVER_CACHE
+    
+    build_start = time.perf_counter()
     
     k = top_k or settings.retriever_top_k
     vector_store = get_langchain_vector_store()
 
     # Determine mode
     parent_mode = use_parent if use_parent is not None else True
+    
+    config = {"use_parent": parent_mode, "top_k": k}
+    _RETRIEVER_CONFIG = config
 
     if parent_mode:
         parent_store = _load_parent_store()
-        logger.info("Building ParentAwareRetriever singleton (top_k={})", k)
+        logger.info(f"Building ParentAwareRetriever singleton (top_k={k})")
         _RETRIEVER_CACHE = ParentAwareRetriever(
             vector_store=vector_store,
             parent_store=parent_store,
             top_k=k,
         )
     else:
-        logger.info("Building StandardRetriever singleton (top_k={})", k)
+        logger.info(f"Building StandardRetriever singleton (top_k={k})")
         _RETRIEVER_CACHE = StandardRetriever(vector_store=vector_store, top_k=k)
     
+    build_time_ms = (time.perf_counter() - build_start) * 1000
+    _RETRIEVER_BUILD_TIME = build_time_ms
+    logger.info(f"Retriever singleton cached in {build_time_ms:.2f}ms")
+    
     return _RETRIEVER_CACHE
+
+
+def get_retriever_stats() -> dict[str, Any]:
+    """Return retriever caching statistics for monitoring."""
+    return {
+        "cached": _RETRIEVER_CACHE is not None,
+        "build_time_ms": _RETRIEVER_BUILD_TIME,
+        "config": _RETRIEVER_CONFIG,
+        "parent_store_size": len(_PARENT_STORE_CACHE) if _PARENT_STORE_CACHE else 0,
+    }
