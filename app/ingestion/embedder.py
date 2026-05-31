@@ -17,6 +17,12 @@ from loguru import logger
 
 from app.core.config import settings
 
+# Optimized batch size configuration for alignment across pipeline
+# These should be tuned based on GPU/CPU memory and throughput
+_EMBEDDING_BATCH_SIZE = None  # Will be set from settings or detected
+_UPSERT_BATCH_SIZE = None     # Aligned with embedding batch for throughput
+_BATCH_SIZE_ALIGNMENT_FACTOR = 1.0  # Allow upsert batches to be multiple of embedding batches
+
 
 @lru_cache(maxsize=1)
 def get_embedding_model() -> HuggingFaceEmbeddings:
@@ -31,9 +37,7 @@ def get_embedding_model() -> HuggingFaceEmbeddings:
     """
     try:
         logger.info(
-            "Loading embedding model '{}' on device '{}'",
-            settings.embedding_model,
-            settings.embedding_device,
+            f"Loading embedding model '{settings.embedding_model}' on device '{settings.embedding_device}'"
         )
 
         model = HuggingFaceEmbeddings(
@@ -54,12 +58,11 @@ def get_embedding_model() -> HuggingFaceEmbeddings:
         # Warm-up pass + dimension probe (avoids cold-start latency on first real query)
         sample = model.embed_query("warm-up")
         logger.info(
-            "Embedding model ready — vector dimension: {}",
-            len(sample),
+            f"Embedding model ready — vector dimension: {len(sample)} | batch_size: {settings.embedding_batch_size}"
         )
         return model
     except Exception as e:
-        logger.error("Failed to load embedding model: {}", str(e))
+        logger.error(f"Failed to load embedding model: {str(e)}")
         raise RuntimeError(f"Embedding model initialization failed: {e}") from e
 
 
@@ -75,8 +78,30 @@ def get_embedding_dimension() -> int:
         dimension = len(model.embed_query("dim-probe"))
         return dimension
     except Exception as e:
-        logger.error("Failed to detect embedding dimension: {}", str(e))
+        logger.error(f"Failed to detect embedding dimension: {str(e)}")
         raise RuntimeError(f"Embedding dimension detection failed: {e}") from e
+
+
+def get_aligned_batch_size(operation: str = "embedding") -> int:
+    """
+    Get batch size optimized for a specific operation.
+    
+    Args:
+        operation: "embedding" or "upsert" to get aligned batch sizes
+    
+    Returns:
+        Optimized batch size for the operation
+    """
+    embedding_batch = settings.embedding_batch_size
+    
+    if operation == "embedding":
+        return embedding_batch
+    elif operation == "upsert":
+        # Upsert batch can often be larger (no GPU memory constraint)
+        # but we align it for predictable throughput
+        return embedding_batch
+    else:
+        return embedding_batch
 
 
 async def embed_documents_parallel(texts: list[str], batch_size: int | None = None) -> list[list[float]]:
@@ -92,7 +117,7 @@ async def embed_documents_parallel(texts: list[str], batch_size: int | None = No
     """
     model = get_embedding_model()
     if batch_size is None:
-        batch_size = settings.embedding_batch_size
+        batch_size = get_aligned_batch_size("embedding")
     
     # Process in parallel batches using asyncio + thread pool
     def embed_batch(batch: list[str]) -> list[list[float]]:
