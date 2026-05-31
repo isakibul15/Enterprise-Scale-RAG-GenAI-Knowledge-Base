@@ -9,12 +9,15 @@ Supported providers:
   - openai       → ChatOpenAI (with HTTP connection pooling for concurrent requests)
   - azure_openai → AzureChatOpenAI (with HTTP connection pooling)
 
-Connection Pooling:
+Connection Pooling & Circuit Breaker:
   - OpenAI/Azure: Uses requests.Session with HTTPAdapter (pool_connections, pool_maxsize)
+  - Circuit breaker: Prevents cascading failures when LLM service is overloaded
   - Ollama: Built-in connection management
 """
 
+import time
 from functools import lru_cache
+from enum import Enum
 
 from langchain_core.language_models import BaseChatModel
 from loguru import logger
@@ -22,6 +25,86 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.core.config import LLMProvider, settings
+
+
+# Circuit breaker states
+class CircuitState(Enum):
+    CLOSED = "closed"        # Normal operation
+    OPEN = "open"            # Failing, reject requests
+    HALF_OPEN = "half_open"  # Testing recovery with limited requests
+
+
+class CircuitBreaker:
+    """
+    Simple circuit breaker implementation for LLM calls.
+    
+    Prevents cascading failures by stopping requests when error rate exceeds threshold.
+    """
+    
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 60.0,
+        success_threshold: int = 3,
+    ):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.success_threshold = success_threshold
+        
+        self.failure_count = 0
+        self.success_count = 0
+        self.last_failure_time = 0.0
+        self.state = CircuitState.CLOSED
+    
+    def record_success(self) -> None:
+        """Record a successful call."""
+        self.failure_count = 0
+        if self.state == CircuitState.HALF_OPEN:
+            self.success_count += 1
+            if self.success_count >= self.success_threshold:
+                self.state = CircuitState.CLOSED
+                self.success_count = 0
+                logger.info("Circuit breaker: CLOSED (recovered)")
+    
+    def record_failure(self) -> None:
+        """Record a failed call."""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+            logger.warning(f"Circuit breaker: OPEN (failures={self.failure_count})")
+    
+    def should_attempt(self) -> bool:
+        """Check if a request should be attempted."""
+        if self.state == CircuitState.CLOSED:
+            return True
+        elif self.state == CircuitState.OPEN:
+            # Try recovery if timeout elapsed
+            if time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = CircuitState.HALF_OPEN
+                self.success_count = 0
+                logger.info("Circuit breaker: HALF_OPEN (testing recovery)")
+                return True
+            return False
+        else:  # HALF_OPEN
+            return True
+    
+    def get_state(self) -> dict:
+        """Get circuit breaker statistics."""
+        return {
+            "state": self.state.value,
+            "failures": self.failure_count,
+            "successes": self.success_count,
+            "last_failure": self.last_failure_time,
+        }
+
+
+# Global circuit breaker instance for LLM calls
+_CIRCUIT_BREAKER = CircuitBreaker(
+    failure_threshold=5,
+    recovery_timeout=60.0,
+    success_threshold=3,
+)
 
 
 def _build_requests_session_with_pooling():
@@ -129,7 +212,12 @@ def get_llm() -> BaseChatModel:
     if builder is None:
         raise ValueError(f"Unsupported LLM_PROVIDER: {provider}")
 
-    logger.info("Initialising LLM | provider={} model={}", provider, settings.llm_model)
+    logger.info(f"Initialising LLM | provider={provider} model={settings.llm_model}")
     llm = builder()
     logger.info("LLM ready")
     return llm
+
+
+def get_circuit_breaker_stats() -> dict:
+    """Get circuit breaker state and statistics for monitoring."""
+    return _CIRCUIT_BREAKER.get_state()
