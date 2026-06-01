@@ -16,7 +16,7 @@ function EmptyState({ onSuggestion }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center select-none">
       {/* Glow orb */}
-      <div className="relative mb-8">
+      <div className="relative mb-12">
         <div
           className="w-20 h-20 rounded-3xl flex items-center justify-center"
           style={{
@@ -33,13 +33,13 @@ function EmptyState({ onSuggestion }) {
         />
       </div>
 
-      <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-400 mb-2">
+      <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-400 mb-3">
         Enterprise Knowledge Base
       </h2>
-      <p className="text-sm text-gray-400 mb-10 max-w-sm leading-relaxed font-medium">
+      <p className="text-sm text-gray-300 mb-3 max-w-sm leading-relaxed font-medium">
         Upload documents using the sidebar, then ask anything.
       </p>
-      <p className="text-xs text-gray-600 mb-8 max-w-sm leading-relaxed">
+      <p className="text-xs text-gray-500 mb-12 max-w-sm leading-relaxed">
         Every answer is grounded in your data with source citations.
       </p>
 
@@ -49,7 +49,7 @@ function EmptyState({ onSuggestion }) {
           <button
             key={i}
             onClick={() => onSuggestion(s)}
-            className="text-left text-xs text-gray-400 hover:text-gray-200 px-4 py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
+            className="text-left text-xs text-gray-400 hover:text-gray-100 px-4 py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
             style={{
               background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.08)',
