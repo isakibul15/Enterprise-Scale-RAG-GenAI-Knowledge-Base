@@ -41,14 +41,14 @@ export function ConfirmDialog() {
 
       {/* Dialog */}
       <div
-        className="relative rounded-xl p-6 max-w-sm w-full shadow-xl animate-fade-in"
+        className="relative rounded-xl p-6 max-w-sm w-full shadow-2xl animate-fade-in"
         style={{
           background: 'rgba(30, 27, 50, 0.95)',
           border: '1px solid rgba(124, 58, 237, 0.2)',
           backdropFilter: 'blur(12px)',
         }}
       >
-        <h2 className="text-lg font-semibold text-gray-100 mb-2">
+        <h2 className="text-lg font-bold text-gray-100 mb-3">
           {dialog.title}
         </h2>
         <p className="text-sm text-gray-400 mb-6 leading-relaxed">
@@ -56,16 +56,16 @@ export function ConfirmDialog() {
         </p>
 
         {/* Buttons */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end pt-2">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-300 hover:bg-white/[0.08] transition-all duration-200"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
             style={{
               background: 'linear-gradient(135deg, #EF4444, #DC2626)',
             }}
