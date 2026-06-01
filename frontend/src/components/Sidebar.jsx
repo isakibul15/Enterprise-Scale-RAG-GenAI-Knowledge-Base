@@ -17,7 +17,7 @@ export default function Sidebar({
     >
       {/* ── Logo / Brand ─────────────────────────────────────────────── */}
       <div
-        className="flex-shrink-0 flex items-center gap-3 px-5 py-5"
+        className="flex-shrink-0 flex items-center gap-3 px-5 py-6"
         style={{ borderBottom: '1px solid rgba(124,58,237,0.1)' }}
       >
         <div
@@ -30,10 +30,10 @@ export default function Sidebar({
           <Brain size={18} className="text-white" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-100 leading-tight truncate">
+          <p className="text-sm font-bold text-gray-100 leading-tight truncate">
             Enterprise RAG
           </p>
-          <p className="text-[10px] text-gray-600 leading-tight">
+          <p className="text-[11px] text-gray-600 leading-tight">
             GenAI Knowledge Base
           </p>
         </div>
