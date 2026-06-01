@@ -55,22 +55,22 @@ function Toast({ message, type, onClose }) {
   const config = {
     success: {
       icon: CheckCircle2,
-      bg: 'bg-emerald-950/90',
-      border: 'border-emerald-700/50',
+      bg: 'bg-emerald-950/95',
+      border: 'border-emerald-700/60',
       text: 'text-emerald-100',
       accent: 'text-emerald-400',
     },
     error: {
       icon: AlertCircle,
-      bg: 'bg-red-950/90',
-      border: 'border-red-700/50',
+      bg: 'bg-red-950/95',
+      border: 'border-red-700/60',
       text: 'text-red-100',
       accent: 'text-red-400',
     },
     info: {
       icon: Info,
-      bg: 'bg-blue-950/90',
-      border: 'border-blue-700/50',
+      bg: 'bg-blue-950/95',
+      border: 'border-blue-700/60',
       text: 'text-blue-100',
       accent: 'text-blue-400',
     },
@@ -82,16 +82,16 @@ function Toast({ message, type, onClose }) {
     <div
       className={`
         ${config.bg} ${config.border} ${config.text}
-        border rounded-lg p-4 flex items-start gap-3 backdrop-blur-sm
-        pointer-events-auto animate-fade-in shadow-lg
-        max-w-sm
+        border rounded-lg p-4 flex items-start gap-3 backdrop-blur-md
+        pointer-events-auto animate-fade-in shadow-xl
+        max-w-sm transform transition-all duration-300
       `}
     >
-      <Icon size={18} className={`${config.accent} flex-shrink-0 mt-0.5`} />
+      <Icon size={20} className={`${config.accent} flex-shrink-0 mt-0.5`} />
       <p className="text-sm font-medium flex-1 leading-relaxed">{message}</p>
       <button
         onClick={onClose}
-        className="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors"
+        className="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors p-0.5 hover:bg-white/5 rounded"
         aria-label="Close notification"
       >
         <X size={16} />
