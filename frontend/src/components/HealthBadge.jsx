@@ -72,7 +72,7 @@ export default function HealthBadge() {
 
       {/* Detail pills */}
       {health && status !== 'error' && (
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           <Pill label="Vector DB" value={health.chromadb} ok={health.chromadb === 'connected'} />
           <Pill label="Embed"     value="ready"           ok />
           <Pill label="LLM"       value={health.llm_provider} ok />
@@ -85,15 +85,15 @@ export default function HealthBadge() {
 function Pill({ label, value, ok }) {
   return (
     <div
-      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide"
       style={{
-        background: ok ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-        border:     `1px solid ${ok ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
-        color:      ok ? '#34D399' : '#FCA5A5',
+        background: ok ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+        border:     `1px solid ${ok ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+        color:      ok ? '#6EE7B7' : '#FECACA',
       }}
     >
-      <span className="text-gray-500">{label}</span>
-      <span>{value}</span>
+      <span className="text-gray-600 font-medium">{label}</span>
+      <span className="font-semibold">{value}</span>
     </div>
   );
 }
