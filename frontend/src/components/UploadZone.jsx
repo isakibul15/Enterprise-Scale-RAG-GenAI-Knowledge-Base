@@ -152,18 +152,18 @@ export default function UploadZone({ onSuccess }) {
 
       {/* Progress bar */}
       {uploading && (
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <Loader2 size={11} className="animate-spin text-violet-400" />
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <span className="flex items-center gap-1.5 text-gray-300 font-medium">
+              <Loader2 size={12} className="animate-spin text-violet-400" />
               Ingesting…
             </span>
-            <span>{progress}%</span>
+            <span className="text-gray-500">{progress}%</span>
           </div>
-          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
             <div
-              className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
+              className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full transition-all duration-300 shadow-lg"
+              style={{ width: `${progress}%`, boxShadow: '0 0 8px rgba(124,58,237,0.5)' }}
             />
           </div>
         </div>
