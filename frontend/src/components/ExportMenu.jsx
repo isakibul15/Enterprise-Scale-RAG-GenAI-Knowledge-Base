@@ -43,16 +43,16 @@ export function ExportMenu({ messages, sessionId }) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="p-2 text-gray-500 hover:text-gray-300 rounded-lg transition-colors hover:bg-white/5"
+        className="p-2.5 text-gray-500 hover:text-gray-300 rounded-lg transition-all duration-200 hover:bg-white/[0.08] group"
         title="Export chat"
         aria-label="Export chat"
       >
-        <Download size={16} />
+        <Download size={18} className="group-hover:scale-110 transition-transform" />
       </button>
 
       {open && (
         <div
-          className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-50 animate-fade-in"
+          className="absolute right-0 mt-2 w-52 rounded-lg shadow-xl z-50 animate-fade-in overflow-hidden"
           style={{
             background: 'var(--menu-bg)',
             border: '1px solid var(--menu-border)',
@@ -62,7 +62,7 @@ export function ExportMenu({ messages, sessionId }) {
         >
           <button
             onClick={() => handleExport('txt')}
-            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm border-b"
+            className="w-full text-left px-4 py-3 transition-all duration-150 flex items-center gap-3 text-sm font-medium border-b"
             style={{
               color: 'var(--menu-text)',
               borderColor: 'rgba(255, 255, 255, 0.05)',
@@ -70,12 +70,12 @@ export function ExportMenu({ messages, sessionId }) {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            <FileText size={14} className="text-violet-400" />
+            <FileText size={16} className="text-violet-400 flex-shrink-0" />
             <span>Export as TXT</span>
           </button>
           <button
             onClick={() => handleExport('json')}
-            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm border-b"
+            className="w-full text-left px-4 py-3 transition-all duration-150 flex items-center gap-3 text-sm font-medium border-b"
             style={{
               color: 'var(--menu-text)',
               borderColor: 'rgba(255, 255, 255, 0.05)',
@@ -83,12 +83,12 @@ export function ExportMenu({ messages, sessionId }) {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            <FileJson size={14} className="text-blue-400" />
+            <FileJson size={16} className="text-blue-400 flex-shrink-0" />
             <span>Export as JSON</span>
           </button>
           <button
             onClick={() => handleExport('html')}
-            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm border-b"
+            className="w-full text-left px-4 py-3 transition-all duration-150 flex items-center gap-3 text-sm font-medium border-b"
             style={{
               color: 'var(--menu-text)',
               borderColor: 'rgba(255, 255, 255, 0.05)',
@@ -96,19 +96,19 @@ export function ExportMenu({ messages, sessionId }) {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            <File size={14} className="text-green-400" />
+            <File size={16} className="text-green-400 flex-shrink-0" />
             <span>Export as HTML</span>
           </button>
           <button
             onClick={() => handleExport('pdf')}
-            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-2 text-sm"
+            className="w-full text-left px-4 py-3 transition-all duration-150 flex items-center gap-3 text-sm font-medium"
             style={{
               color: 'var(--menu-text)',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--menu-hover-bg)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            <File size={14} className="text-red-400" />
+            <File size={16} className="text-red-400 flex-shrink-0" />
             <span>Export as PDF</span>
           </button>
         </div>
