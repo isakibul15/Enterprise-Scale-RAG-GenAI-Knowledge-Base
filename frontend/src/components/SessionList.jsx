@@ -167,22 +167,22 @@ export default function SessionList({ activeSession, onSelect, onNew, refreshTri
                   w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left
                   transition-all duration-150 group
                   ${isActive
-                    ? 'bg-violet-600/15 border border-violet-600/30 text-violet-300'
-                    : 'hover:bg-white/[0.04] border border-transparent text-gray-400 hover:text-gray-200'
+                    ? 'bg-violet-600/20 border border-violet-600/40 text-violet-200'
+                    : 'hover:bg-white/[0.06] border border-transparent text-gray-400 hover:text-gray-200'
                   }
                 `}
               >
                 <MessageSquare
                   size={13}
-                  className={isActive ? 'text-violet-400 flex-shrink-0' : 'text-gray-600 flex-shrink-0'}
+                  className={isActive ? 'text-violet-400 flex-shrink-0' : 'text-gray-600 group-hover:text-gray-500 flex-shrink-0 transition-colors'}
                 />
                 <span className="flex-1 min-w-0 truncate text-xs font-medium">
                   {label(id)}
                 </span>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => handleStartEdit(e, id)}
-                    className="text-gray-600 hover:text-violet-400 transition-colors flex-shrink-0"
+                    className="text-gray-600 hover:text-violet-400 transition-colors flex-shrink-0 p-0.5"
                     title="Rename session"
                   >
                     <Edit2 size={11} />
@@ -190,7 +190,7 @@ export default function SessionList({ activeSession, onSelect, onNew, refreshTri
                   <button
                     onClick={(e) => handleDelete(e, id)}
                     className={`
-                      text-gray-600 hover:text-red-400 transition-colors flex-shrink-0
+                      text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-0.5
                       ${deletingId === id ? 'opacity-100' : ''}
                     `}
                     title="Delete session"
