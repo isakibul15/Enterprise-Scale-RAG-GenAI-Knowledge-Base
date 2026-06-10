@@ -23,7 +23,7 @@ A production-ready Retrieval-Augmented Generation (RAG) API. Upload documents, a
 - 🔍 **Semantic Search** — Find relevant context using embeddings  
 - 💬 **Conversational RAG** — Chat with citations, session history  
 - ⚡ **Streaming Responses** — Real-time token-by-token answers  
-- 🛡️ **No Hallucinations** — Grounded answers backed by source documents  
+- 🛡️ **No Halluci nations** — Grounded answers backed by source documents  
 - 🐳 **Production Ready** — Docker, scaling, comprehensive API  
 
 ---
