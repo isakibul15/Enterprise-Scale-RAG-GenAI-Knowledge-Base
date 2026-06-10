@@ -1,11 +1,11 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Send, Square, Sparkles, ChevronDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import { streamQuery } from '../api/client';
 import { useToast } from './Toast';
 
 /* ── Empty / welcome state ──────────────────────────────────────────────── */
-function EmptyState({ onSuggestion }) {
+const EmptyState = ({ onSuggestion }) => {
   const suggestions = [
     'Summarize the key findings in the uploaded documents.',
     'What are the main topics covered in the knowledge base?',
@@ -69,10 +69,11 @@ function EmptyState({ onSuggestion }) {
       </div>
     </div>
   );
-}
+};
+EmptyState.displayName = 'EmptyState';
 
 /* ── Scroll-to-bottom button ────────────────────────────────────────────── */
-function ScrollButton({ onClick }) {
+const ScrollButton = ({ onClick }) => {
   return (
     <button
       onClick={onClick}
